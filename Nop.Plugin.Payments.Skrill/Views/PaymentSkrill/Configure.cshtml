@@ -1,0 +1,82 @@
+﻿@{
+    Layout = "";
+}
+@model ConfigurationModel
+@using Nop.Plugin.Payments.Skrill
+@using Nop.Plugin.Payments.Skrill.Models;
+@using Nop.Web.Framework;
+@Html.Action("StoreScopeConfiguration", "Setting", new { area = "Admin" })
+
+@using (Html.BeginForm())
+{
+    @Html.AntiForgeryToken()
+    <table class="adminContent">
+        <tr>
+            <td colspan="2">
+                <p>If you're using this gateway ensure that your primary store currency is supported by Skrill.</p>
+                <div>
+                    Signup for a Skrill test account:
+                    <ul>
+                        <li>Sign up for a Skrill “Business account”. Do not use the same email you’ll be using for your real account.</li>
+                        <li>Sign up for a Skrill “Personal account”. Use a different email than the “Business account”. Do not use the same email you’ll be using for your real account.</li>
+                        <li>
+                            Contact Skrill and ask them to convert these 2 accounts to test accounts. It doesn’t need to be a long email. Just something simple like:<br>
+                            We need you to turn 2 accounts to test accounts:<br>
+                            “Buyer account”: <br>
+                            Email: buyer-email@example.com<br>
+                            Customer ID: 12456789<br>
+                            “Merchant account”: <br>
+                            Email: merchant-email@example.com<br>
+                            Customer ID: 98765421
+                        </li>
+                    </ul>
+                </div>
+            </td>
+        </tr>
+        <tr>
+            <td class="adminTitle">
+                @Html.OverrideStoreCheckboxFor(model => model.PayToEmail_OverrideForStore, model => model.PayToEmail, Model.ActiveStoreScopeConfiguration)
+                @Html.NopLabelFor(model => model.PayToEmail):
+            </td>
+            <td class="adminData">
+                @Html.EditorFor(model => model.PayToEmail)
+                @Html.ValidationMessageFor(model => model.PayToEmail)
+            </td>
+        </tr>
+        <tr>
+            <td class="adminTitle">
+                @Html.OverrideStoreCheckboxFor(model => model.SecretWord_OverrideForStore, model => model.SecretWord, Model.ActiveStoreScopeConfiguration)
+                @Html.NopLabelFor(model => model.SecretWord):
+            </td>
+            <td class="adminData">
+                @Html.EditorFor(model => model.SecretWord)
+                @Html.ValidationMessageFor(model => model.SecretWord)
+            </td>
+        </tr>
+        <tr>
+            <td class="adminTitle">
+                @Html.OverrideStoreCheckboxFor(model => model.AdditionalFee_OverrideForStore, model => model.AdditionalFee, Model.ActiveStoreScopeConfiguration)
+                @Html.NopLabelFor(model => model.AdditionalFee):
+            </td>
+            <td class="adminData">
+                @Html.EditorFor(model => model.AdditionalFee)
+                @Html.ValidationMessageFor(model => model.AdditionalFee)
+            </td>
+        </tr>
+        <tr>
+            <td class="adminTitle">
+                @Html.OverrideStoreCheckboxFor(model => model.AdditionalFeePercentage_OverrideForStore, model => model.AdditionalFeePercentage, Model.ActiveStoreScopeConfiguration)
+                @Html.NopLabelFor(model => model.AdditionalFeePercentage):
+            </td>
+            <td class="adminData">
+                @Html.EditorFor(model => model.AdditionalFeePercentage)
+                @Html.ValidationMessageFor(model => model.AdditionalFeePercentage)
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2" width="100%">
+                <input type="submit" name="save" class="k-button" value="@T("Admin.Common.Save")" />
+            </td>
+        </tr>
+    </table>
+}
