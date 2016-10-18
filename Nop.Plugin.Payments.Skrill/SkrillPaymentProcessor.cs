@@ -1,9 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Security.Cryptography;
-using System.Security.Policy;
-using System.Text;
 using System.Web;
 using System.Web.Routing;
 using Nop.Core;
@@ -31,24 +28,24 @@ namespace Nop.Plugin.Payments.Skrill
         private readonly SkrillPaymentSettings _skrillPaymentSettings;
         private readonly ISettingService _settingService;
         private readonly IOrderTotalCalculationService _orderTotalCalculationService;
-        private readonly HttpContextBase _httpContext;
         private readonly IStoreContext _storeContext;
         private readonly IWebHelper _webHelper;
         private readonly ICurrencyService _currencyService;
         private readonly CurrencySettings _currencySettings;
+
+        private const string SKRILL_URL = "https://www.moneybookers.com/app/payment.pl";
         #endregion
 
         #region Ctor
 
         public SkrillPaymentProcessor(SkrillPaymentSettings skrillPaymentSettings,
             ISettingService settingService, IOrderTotalCalculationService orderTotalCalculationService, 
-            HttpContextBase httpContext, IStoreContext storeContext, IWebHelper webHelper,
+            IStoreContext storeContext, IWebHelper webHelper,
             ICurrencyService currencyService, CurrencySettings currencySettings)
         {
             this._skrillPaymentSettings = skrillPaymentSettings;
             this._settingService = settingService;
             this._orderTotalCalculationService = orderTotalCalculationService;
-            this._httpContext = httpContext;
             this._storeContext = storeContext;
             this._webHelper = webHelper;
             this._currencyService = currencyService;
@@ -56,20 +53,7 @@ namespace Nop.Plugin.Payments.Skrill
         }
 
         #endregion
-
-        #region Utilities
-
-        /// <summary>
-        /// Gets Skrill URL
-        /// </summary>
-        /// <returns></returns>
-        private string GetSkrillUrl()
-        {
-            return "https://www.moneybookers.com/app/payment.pl";
-        }
-
-        #endregion
-
+        
         #region Methods
 
         /// <summary>
@@ -79,7 +63,7 @@ namespace Nop.Plugin.Payments.Skrill
         /// <returns>Process payment result</returns>
         public ProcessPaymentResult ProcessPayment(ProcessPaymentRequest processPaymentRequest)
         {
-            var result = new ProcessPaymentResult {NewPaymentStatus = PaymentStatus.Pending};
+            var result = new ProcessPaymentResult { NewPaymentStatus = PaymentStatus.Pending };
             return result;
         }
 
@@ -90,11 +74,14 @@ namespace Nop.Plugin.Payments.Skrill
         public void PostProcessPayment(PostProcessPaymentRequest postProcessPaymentRequest)
         {
             var order = postProcessPaymentRequest.Order;
-            var url = GetSkrillUrl();
-            var gatewayUrl = new Uri(url);
+            var gatewayUrl = new Uri(SKRILL_URL);
 
-            var remotePostHelper = new RemotePost { Url = gatewayUrl.ToString(), Method = "POST" };
-            remotePostHelper.FormName = "SkrillForm";
+            var remotePostHelper = new RemotePost
+            {
+                Url = gatewayUrl.ToString(),
+                Method = "POST",
+                FormName = "SkrillForm"
+            };
 
             remotePostHelper.Add("pay_to_email", _skrillPaymentSettings.PayToEmail);
             remotePostHelper.Add("pay_from_email", order.Customer.Email);
@@ -102,8 +89,8 @@ namespace Nop.Plugin.Payments.Skrill
             remotePostHelper.Add("transaction_id", order.Id.ToString());
             remotePostHelper.Add("return_url", _webHelper.GetStoreLocation(false) + "checkout/completed?order_id=" + order.Id);
             remotePostHelper.Add("cancel_url", _webHelper.GetStoreLocation(false));
-            //remotePostHelper.Add("status_url", _webHelper.GetStoreLocation(false) + "Plugins/PaymentSkrill/ResponseNotificationHandler");
-            remotePostHelper.Add("status_url", "http://www.nopcommerce.com/recordquerytest.aspx");
+            remotePostHelper.Add("status_url", _webHelper.GetStoreLocation(false) + "Plugins/PaymentSkrill/ResponseNotificationHandler");
+            //remotePostHelper.Add("status_url", "http://www.nopcommerce.com/recordquerytest.aspx");
             //supported languages (EN, DE, ES, FR, IT, PL, GR, RO, RU, TR, CN, CZ or NL)
             remotePostHelper.Add("language", "EN");
             remotePostHelper.Add("amount", order.OrderTotal.ToString(new CultureInfo("en-US", false).NumberFormat));
@@ -243,7 +230,7 @@ namespace Nop.Plugin.Payments.Skrill
         {
             actionName = "Configure";
             controllerName = "PaymentSkrill";
-            routeValues = new RouteValueDictionary() { { "Namespaces", "Nop.Plugin.Payments.Skrill.Controllers" }, { "area", null } };
+            routeValues = new RouteValueDictionary { { "Namespaces", "Nop.Plugin.Payments.Skrill.Controllers" }, { "area", null } };
         }
 
         /// <summary>
@@ -256,7 +243,7 @@ namespace Nop.Plugin.Payments.Skrill
         {
             actionName = "PaymentInfo";
             controllerName = "PaymentSkrill";
-            routeValues = new RouteValueDictionary() { { "Namespaces", "Nop.Plugin.Payments.Skrill.Controllers" }, { "area", null } };
+            routeValues = new RouteValueDictionary { { "Namespaces", "Nop.Plugin.Payments.Skrill.Controllers" }, { "area", null } };
         }
 
         public Type GetControllerType()
@@ -267,7 +254,7 @@ namespace Nop.Plugin.Payments.Skrill
         public override void Install()
         {
             //settings
-            var settings = new SkrillPaymentSettings()
+            var settings = new SkrillPaymentSettings
             {
                 PayToEmail = "name@yourStore.com",
             };
@@ -279,6 +266,7 @@ namespace Nop.Plugin.Payments.Skrill
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Skrill.Fields.PayToEmail.Hint", "Pay to email.");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Skrill.Fields.SecretWord", "Secret word");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Skrill.Fields.SecretWord.Hint", "Secret word.");
+            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Skrill.Fields.AdditionalFee", "Additional fee"); 
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Skrill.Fields.AdditionalFee.Hint", "Enter additional fee to charge your customers.");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Skrill.Fields.AdditionalFeePercentage", "Additional fee. Use percentage");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Skrill.Fields.AdditionalFeePercentage.Hint", "Determines whether to apply a percentage additional fee to the order total. If not enabled, a fixed value is used.");

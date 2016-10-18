@@ -4,8 +4,14 @@ namespace Nop.Plugin.Payments.Skrill
 {
     public class SkrillPaymentSettings : ISettings
     {
+        /// <summary>
+        /// Pay to emmail
+        /// </summary>
         public string PayToEmail { get; set; }
 
+        /// <summary>
+        /// Secret word
+        /// </summary>
         public string SecretWord { get; set; }
 
         /// <summary>
