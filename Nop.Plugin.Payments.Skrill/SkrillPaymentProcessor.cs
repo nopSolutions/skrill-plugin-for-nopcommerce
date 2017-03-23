@@ -32,6 +32,7 @@ namespace Nop.Plugin.Payments.Skrill
         private readonly IWebHelper _webHelper;
         private readonly ICurrencyService _currencyService;
         private readonly CurrencySettings _currencySettings;
+        private readonly ILocalizationService _localizationService;
 
         private const string SKRILL_URL = "https://www.moneybookers.com/app/payment.pl";
         #endregion
@@ -41,7 +42,8 @@ namespace Nop.Plugin.Payments.Skrill
         public SkrillPaymentProcessor(SkrillPaymentSettings skrillPaymentSettings,
             ISettingService settingService, IOrderTotalCalculationService orderTotalCalculationService, 
             IStoreContext storeContext, IWebHelper webHelper,
-            ICurrencyService currencyService, CurrencySettings currencySettings)
+            ICurrencyService currencyService, CurrencySettings currencySettings,
+            ILocalizationService localizationService)
         {
             this._skrillPaymentSettings = skrillPaymentSettings;
             this._settingService = settingService;
@@ -50,6 +52,7 @@ namespace Nop.Plugin.Payments.Skrill
             this._webHelper = webHelper;
             this._currencyService = currencyService;
             this._currencySettings = currencySettings;
+            this._localizationService = localizationService;
         }
 
         #endregion
@@ -87,9 +90,9 @@ namespace Nop.Plugin.Payments.Skrill
             remotePostHelper.Add("pay_from_email", order.Customer.Email);
             remotePostHelper.Add("recipient_description", _storeContext.CurrentStore.Name);
             remotePostHelper.Add("transaction_id", order.Id.ToString());
-            remotePostHelper.Add("return_url", _webHelper.GetStoreLocation(false) + "checkout/completed?order_id=" + order.Id);
-            remotePostHelper.Add("cancel_url", _webHelper.GetStoreLocation(false));
-            remotePostHelper.Add("status_url", _webHelper.GetStoreLocation(false) + "Plugins/PaymentSkrill/ResponseNotificationHandler");
+            remotePostHelper.Add("return_url", _webHelper.GetStoreLocation() + "checkout/completed?order_id=" + order.Id);
+            remotePostHelper.Add("cancel_url", _webHelper.GetStoreLocation());
+            remotePostHelper.Add("status_url", _webHelper.GetStoreLocation() + "Plugins/PaymentSkrill/ResponseNotificationHandler");
             //remotePostHelper.Add("status_url", "http://www.nopcommerce.com/recordquerytest.aspx");
             //supported languages (EN, DE, ES, FR, IT, PL, GR, RO, RU, TR, CN, CZ or NL)
             remotePostHelper.Add("language", "EN");
@@ -270,6 +273,7 @@ namespace Nop.Plugin.Payments.Skrill
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Skrill.Fields.AdditionalFee.Hint", "Enter additional fee to charge your customers.");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Skrill.Fields.AdditionalFeePercentage", "Additional fee. Use percentage");
             this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Skrill.Fields.AdditionalFeePercentage.Hint", "Determines whether to apply a percentage additional fee to the order total. If not enabled, a fixed value is used.");
+            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.Skrill.PaymentMethodDescription", "You will be redirected to Skrill site to complete the order.");
 
             base.Install();
         }
@@ -289,6 +293,7 @@ namespace Nop.Plugin.Payments.Skrill
             this.DeletePluginLocaleResource("Plugins.Payments.Skrill.Fields.AdditionalFee.Hint");
             this.DeletePluginLocaleResource("Plugins.Payments.Skrill.Fields.AdditionalFeePercentage");
             this.DeletePluginLocaleResource("Plugins.Payments.Skrill.Fields.AdditionalFeePercentage.Hint");
+            this.DeletePluginLocaleResource("Plugins.Payments.Skrill.PaymentMethodDescription");
             
             base.Uninstall();
         }
@@ -372,6 +377,14 @@ namespace Nop.Plugin.Payments.Skrill
             {
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Gets a payment method description that will be displayed on checkout pages in the public store
+        /// </summary>
+        public string PaymentMethodDescription
+        {
+            get { return _localizationService.GetResource("Plugins.Payments.Skrill.PaymentMethodDescription"); }
         }
 
         #endregion

@@ -72,7 +72,7 @@ namespace Nop.Plugin.Payments.Skrill.Controllers
                 model.AdditionalFeePercentage_OverrideForStore = _settingService.SettingExists(skrillPaymentSettings, x => x.AdditionalFeePercentage, storeScope);
             }
 
-            return View("~/Plugins/Payments.Skrill/Views/PaymentSkrill/Configure.cshtml", model);
+            return View("~/Plugins/Payments.Skrill/Views/Configure.cshtml", model);
         }
 
         [HttpPost]
@@ -125,7 +125,7 @@ namespace Nop.Plugin.Payments.Skrill.Controllers
         [ChildActionOnly]
         public ActionResult PaymentInfo()
         {
-            return View("~/Plugins/Payments.Skrill/Views/PaymentSkrill/PaymentInfo.cshtml");
+            return View("~/Plugins/Payments.Skrill/Views/PaymentInfo.cshtml");
         }
 
         [NonAction]
