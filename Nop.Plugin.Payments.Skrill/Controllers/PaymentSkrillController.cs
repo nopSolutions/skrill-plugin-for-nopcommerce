@@ -1,8 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
-using System.Web.Mvc;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Nop.Core;
 using Nop.Core.Domain.Orders;
 using Nop.Plugin.Payments.Skrill.Models;
@@ -10,9 +11,11 @@ using Nop.Services.Configuration;
 using Nop.Services.Localization;
 using Nop.Services.Logging;
 using Nop.Services.Orders;
-using Nop.Services.Payments;
+using Nop.Services.Security;
 using Nop.Services.Stores;
+using Nop.Web.Framework;
 using Nop.Web.Framework.Controllers;
+using Nop.Web.Framework.Mvc.Filters;
 
 namespace Nop.Plugin.Payments.Skrill.Controllers
 {
@@ -26,6 +29,8 @@ namespace Nop.Plugin.Payments.Skrill.Controllers
         private readonly ILogger _logger;
         private readonly SkrillPaymentSettings _skrillPaymentSettings;
         private readonly ILocalizationService _localizationService;
+        private readonly IWebHelper _webHelper;
+        private readonly IPermissionService _permissionService;
 
         public PaymentSkrillController(IWorkContext workContext,
             IStoreService storeService,
@@ -34,7 +39,9 @@ namespace Nop.Plugin.Payments.Skrill.Controllers
             IOrderProcessingService orderProcessingService,
             ILogger logger,
             SkrillPaymentSettings skrillPaymentSettings,
-            ILocalizationService localizationService)
+            ILocalizationService localizationService,
+            IWebHelper webHelper,
+            IPermissionService permissionService)
         {
             this._workContext = workContext;
             this._storeService = storeService;
@@ -44,12 +51,22 @@ namespace Nop.Plugin.Payments.Skrill.Controllers
             this._logger = logger;
             this._skrillPaymentSettings = skrillPaymentSettings;
             this._localizationService = localizationService;
+            this._webHelper = webHelper;
+            this._permissionService = permissionService;
         }
 
-        [AdminAuthorize]
-        [ChildActionOnly]
-        public ActionResult Configure()
+        private string GetValue(string key, IFormCollection form)
         {
+            return (form.Keys.Contains(key) ? form[key].ToString() : _webHelper.QueryString<string>(key)) ?? string.Empty;
+        }
+
+        [AuthorizeAdmin]
+        [Area(AreaNames.Admin)]
+        public IActionResult Configure()
+        {
+            if (!_permissionService.Authorize(StandardPermissionProvider.ManagePaymentMethods))
+                return AccessDeniedView();
+
             //load settings for a chosen store scope
             var storeScope = GetActiveStoreScopeConfiguration(_storeService, _workContext);
             var skrillPaymentSettings = _settingService.LoadSetting<SkrillPaymentSettings>(storeScope);
@@ -76,10 +93,13 @@ namespace Nop.Plugin.Payments.Skrill.Controllers
         }
 
         [HttpPost]
-        [AdminAuthorize]
-        [ChildActionOnly]
-        public ActionResult Configure(ConfigurationModel model)
+        [AuthorizeAdmin]
+        [Area(AreaNames.Admin)]
+        public IActionResult Configure(ConfigurationModel model)
         {
+            if (!_permissionService.Authorize(StandardPermissionProvider.ManagePaymentMethods))
+                return AccessDeniedView();
+
             if (!ModelState.IsValid)
                 return Configure();
 
@@ -122,34 +142,13 @@ namespace Nop.Plugin.Payments.Skrill.Controllers
             return hex.ToString();
         }
 
-        [ChildActionOnly]
-        public ActionResult PaymentInfo()
+        public IActionResult ResponseNotificationHandler()
         {
-            return View("~/Plugins/Payments.Skrill/Views/PaymentInfo.cshtml");
-        }
-
-        [NonAction]
-        public override IList<string> ValidatePaymentForm(FormCollection form)
-        {
-            var warnings = new List<string>();
-            return warnings;
-        }
-
-        [NonAction]
-        public override ProcessPaymentRequest GetPaymentInfo(FormCollection form)
-        {
-            var paymentInfo = new ProcessPaymentRequest();
-            return paymentInfo;
-        }
-
-        [ValidateInput(false)]
-        public ActionResult ResponseNotificationHandler()
-        {
-            var orderIdValue = Request["transaction_id"];
-            int orderId;
-            if (!int.TryParse(orderIdValue, out orderId))
+            var form = Request.Form;
+            var orderIdValue = GetValue("transaction_id", form);
+            if (!int.TryParse(orderIdValue, out int orderId))
             {
-                var errorStr = "Skrill response notification. Can\'t parse order id";
+                const string errorStr = "Skrill response notification. Can\'t parse order id";
                 _logger.Error(errorStr);
                 return Content("");
             }
@@ -159,43 +158,43 @@ namespace Nop.Plugin.Payments.Skrill.Controllers
             //no order found
             if (order == null)
             {
-                var errorStr = string.Format("Skrill response notification. No order found with the specified id: {0}", orderId);
+                var errorStr = $"Skrill response notification. No order found with the specified id: {orderId}";
                 _logger.Error(errorStr);
                 return Content("");
             }
 
             //validate the Skrill signature
-            var concatFields = Request["merchant_id"]
-                               + Request["transaction_id"]
+            var concatFields = GetValue("merchant_id", form)
+                               + GetValue("transaction_id", form)
                                + StringToMD5(_skrillPaymentSettings.SecretWord)
-                               + Request["mb_amount"]
-                               + Request["mb_currency"]
-                               + Request["status"];
+                               + GetValue("mb_amount", form)
+                               + GetValue("mb_currency", form)
+                               + GetValue("status", form);
 
             var payToEmail = _skrillPaymentSettings.PayToEmail;
 
             //ensure that the signature is valid
-            if (!Request["md5sig"].Equals(StringToMD5(concatFields)))
+            if (GetValue("md5sig", form).Equals(StringToMD5(concatFields)))
             {
-                var errorStr = string.Format("Skrill response notification. Hash value doesn't match. Order id: {0}", order.Id);
+                var errorStr = $"Skrill response notification. Hash value doesn't match. Order id: {order.Id}";
                 _logger.Error(errorStr);
 
                 return Content("");
             }
 
             //ensure that the money is going to you
-            if (Request["pay_to_email"] != payToEmail)
+            if (GetValue("pay_to_email", form) != payToEmail)
             {
-                var errorStr = string.Format("Skrill response notification. Returned 'Pay to' email {0} doesn't equal 'Pay to' email {1}. Order id: {2}", Request["pay_to_email"], payToEmail, order.Id);
+                var errorStr = $"Skrill response notification. Returned 'Pay to' email {GetValue("pay_to_email", form)} doesn't equal 'Pay to' email {payToEmail}. Order id: {order.Id}";
                 _logger.Error(errorStr);
 
                 return Content("");
             }
 
             //ensure that the status code == 2
-            if (Request["status"] != "2")
+            if (GetValue("status", form) != "2")
             {
-                var errorStr = string.Format("Skrill response notification. Wrong status: {0}. Order id: {1}", Request["status"], order.Id);
+                var errorStr = $"Skrill response notification. Wrong status: {GetValue("status", form)}. Order id: {order.Id}";
                 _logger.Error(errorStr);
 
                 return Content("");
@@ -203,9 +202,11 @@ namespace Nop.Plugin.Payments.Skrill.Controllers
 
             var sb = new StringBuilder();
             sb.AppendLine("Skrill response notification.");
-            foreach (var key in Request.Params.AllKeys)
+            var keys = form.Keys.ToList();
+            keys.AddRange(Request.Query.Keys.ToArray());
+            foreach (var key in keys)
             {
-                sb.AppendLine(key + ": " + Request[key]);
+                sb.AppendLine(key + ": " + GetValue(key, form));
             }
 
             //order note
@@ -220,7 +221,7 @@ namespace Nop.Plugin.Payments.Skrill.Controllers
             //can mark order is paid?
             if (_orderProcessingService.CanMarkOrderAsPaid(order))
             {
-                order.AuthorizationTransactionId = Request["mb_transaction_id"];
+                order.AuthorizationTransactionId = GetValue("mb_transaction_id", form);
                 _orderService.UpdateOrder(order);
                 _orderProcessingService.MarkOrderAsPaid(order);
             }

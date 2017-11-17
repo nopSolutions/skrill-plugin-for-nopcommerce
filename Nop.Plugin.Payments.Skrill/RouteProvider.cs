@@ -1,20 +1,19 @@
-﻿using System.Web.Mvc;
-using System.Web.Routing;
-using Nop.Web.Framework.Mvc.Routes;
+﻿using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Routing;
+using Nop.Web.Framework.Mvc.Routing;
 
 namespace Nop.Plugin.Payments.Skrill
 {
     public partial class RouteProvider : IRouteProvider
     {
-        public void RegisterRoutes(RouteCollection routes)
+        void IRouteProvider.RegisterRoutes(IRouteBuilder routeBuilder)
         {
             //response notification
-            routes.MapRoute("Plugin.Payments.Skrill.ResponseNotificationHandler",
+            routeBuilder.MapRoute("Plugin.Payments.Skrill.ResponseNotificationHandler",
                  "Plugins/PaymentSkrill/ResponseNotificationHandler",
-                 new { controller = "PaymentSkrill", action = "ResponseNotificationHandler" },
-                 new[] { "Nop.Plugin.Payments.Skrill.Controllers" }
-            );
+                 new { controller = "PaymentSkrill", action = "ResponseNotificationHandler" });
         }
+
         public int Priority
         {
             get

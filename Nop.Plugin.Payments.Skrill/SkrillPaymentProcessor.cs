@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Web;
-using System.Web.Routing;
+using System.Net;
+using Microsoft.AspNetCore.Http;
 using Nop.Core;
 using Nop.Core.Domain.Directory;
 using Nop.Core.Domain.Orders;
@@ -110,11 +110,11 @@ namespace Nop.Plugin.Payments.Skrill
 
             remotePostHelper.Add("state",
                 order.BillingAddress.StateProvince != null
-                    ? HttpUtility.UrlEncode(postProcessPaymentRequest.Order.BillingAddress.StateProvince.Abbreviation)
+                    ? WebUtility.UrlEncode(postProcessPaymentRequest.Order.BillingAddress.StateProvince.Abbreviation)
                     : "");
             remotePostHelper.Add("country",
                 postProcessPaymentRequest.Order.BillingAddress.Country != null
-                    ? HttpUtility.UrlEncode(postProcessPaymentRequest.Order.BillingAddress.Country.TwoLetterIsoCode)
+                    ? WebUtility.UrlEncode(postProcessPaymentRequest.Order.BillingAddress.Country.TwoLetterIsoCode)
                     : "");
 
             remotePostHelper.Post();
@@ -213,7 +213,7 @@ namespace Nop.Plugin.Payments.Skrill
         public bool CanRePostProcessPayment(Order order)
         {
             if (order == null)
-                throw new ArgumentNullException("order");
+                throw new ArgumentNullException(nameof(order));
             
             //let's ensure that at least 5 seconds passed after order is placed
             //P.S. there's no any particular reason for that. we just do it
@@ -223,30 +223,26 @@ namespace Nop.Plugin.Payments.Skrill
             return true;
         }
 
-        /// <summary>
-        /// Gets a route for provider configuration
-        /// </summary>
-        /// <param name="actionName">Action name</param>
-        /// <param name="controllerName">Controller name</param>
-        /// <param name="routeValues">Route values</param>
-        public void GetConfigurationRoute(out string actionName, out string controllerName, out RouteValueDictionary routeValues)
+        public override string GetConfigurationPageUrl()
         {
-            actionName = "Configure";
-            controllerName = "PaymentSkrill";
-            routeValues = new RouteValueDictionary { { "Namespaces", "Nop.Plugin.Payments.Skrill.Controllers" }, { "area", null } };
+            return $"{_webHelper.GetStoreLocation()}Admin/PaymentSkrill/Configure";
+        }
+        
+        public IList<string> ValidatePaymentForm(IFormCollection form)
+        {
+            var warnings = new List<string>();
+            return warnings;
         }
 
-        /// <summary>
-        /// Gets a route for payment info
-        /// </summary>
-        /// <param name="actionName">Action name</param>
-        /// <param name="controllerName">Controller name</param>
-        /// <param name="routeValues">Route values</param>
-        public void GetPaymentInfoRoute(out string actionName, out string controllerName, out RouteValueDictionary routeValues)
+        public ProcessPaymentRequest GetPaymentInfo(IFormCollection form)
         {
-            actionName = "PaymentInfo";
-            controllerName = "PaymentSkrill";
-            routeValues = new RouteValueDictionary { { "Namespaces", "Nop.Plugin.Payments.Skrill.Controllers" }, { "area", null } };
+            var paymentInfo = new ProcessPaymentRequest();
+            return paymentInfo;
+        }
+
+        public void GetPublicViewComponent(out string viewComponentName)
+        {
+            viewComponentName = "PaymentSkrill";
         }
 
         public Type GetControllerType()
