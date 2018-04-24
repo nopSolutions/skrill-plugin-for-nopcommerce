@@ -142,9 +142,10 @@ namespace Nop.Plugin.Payments.Skrill.Controllers
             return hex.ToString();
         }
 
-        public IActionResult ResponseNotificationHandler()
+        public IActionResult ResponseNotificationHandler(IpnModel model)
         {
-            var form = Request.Form;
+            var form = model.Form;
+
             var orderIdValue = GetValue("transaction_id", form);
             if (!int.TryParse(orderIdValue, out int orderId))
             {
@@ -174,7 +175,7 @@ namespace Nop.Plugin.Payments.Skrill.Controllers
             var payToEmail = _skrillPaymentSettings.PayToEmail;
 
             //ensure that the signature is valid
-            if (GetValue("md5sig", form).Equals(StringToMD5(concatFields)))
+            if (!GetValue("md5sig", form).Equals(StringToMD5(concatFields), StringComparison.InvariantCultureIgnoreCase))
             {
                 var errorStr = $"Skrill response notification. Hash value doesn't match. Order id: {order.Id}";
                 _logger.Error(errorStr);
