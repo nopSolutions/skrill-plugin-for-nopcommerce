@@ -21,8 +21,7 @@ namespace Nop.Plugin.Payments.Skrill.Controllers
 {
     public class PaymentSkrillController : BasePaymentController
     {
-        private readonly IWorkContext _workContext;
-        private readonly IStoreService _storeService;
+        private readonly IStoreContext _storeContext;
         private readonly ISettingService _settingService;
         private readonly IOrderService _orderService;
         private readonly IOrderProcessingService _orderProcessingService;
@@ -32,8 +31,8 @@ namespace Nop.Plugin.Payments.Skrill.Controllers
         private readonly IWebHelper _webHelper;
         private readonly IPermissionService _permissionService;
 
-        public PaymentSkrillController(IWorkContext workContext,
-            IStoreService storeService,
+        public PaymentSkrillController(
+            IStoreContext storeContext,
             ISettingService settingService,
             IOrderService orderService,
             IOrderProcessingService orderProcessingService,
@@ -43,8 +42,7 @@ namespace Nop.Plugin.Payments.Skrill.Controllers
             IWebHelper webHelper,
             IPermissionService permissionService)
         {
-            this._workContext = workContext;
-            this._storeService = storeService;
+            this._storeContext = storeContext;
             this._settingService = settingService;
             this._orderService = orderService;
             this._orderProcessingService = orderProcessingService;
@@ -68,7 +66,7 @@ namespace Nop.Plugin.Payments.Skrill.Controllers
                 return AccessDeniedView();
 
             //load settings for a chosen store scope
-            var storeScope = GetActiveStoreScopeConfiguration(_storeService, _workContext);
+            var storeScope = _storeContext.ActiveStoreScopeConfiguration;
             var skrillPaymentSettings = _settingService.LoadSetting<SkrillPaymentSettings>(storeScope);
 
             var model = new ConfigurationModel
@@ -104,7 +102,7 @@ namespace Nop.Plugin.Payments.Skrill.Controllers
                 return Configure();
 
             //load settings for a chosen store scope
-            var storeScope = this.GetActiveStoreScopeConfiguration(_storeService, _workContext);
+            var storeScope = _storeContext.ActiveStoreScopeConfiguration;
             var skrillPaymentSettings = _settingService.LoadSetting<SkrillPaymentSettings>(storeScope);
 
             //save settings
