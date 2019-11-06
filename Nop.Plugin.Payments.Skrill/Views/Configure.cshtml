@@ -1,84 +1,65 @@
-﻿@{
+﻿@model ConfigurationModel;
+
+@{
     Layout = "_ConfigurePlugin";
 }
-@model Nop.Plugin.Payments.Skrill.Models.ConfigurationModel
 
 @await Component.InvokeAsync("StoreScopeConfiguration")
 
-<form asp-controller="PaymentSkrill" asp-action="Configure" method="post">
+<form asp-controller="Skrill" asp-action="Configure" method="post">
     <div class="panel-group">
         <div class="panel panel-default">
             <div class="panel-body">
-
-                <p>If you're using this gateway ensure that your primary store currency is supported by Skrill.</p>
-                <div>
-                    Signup for a Skrill test account:
-                    <ul>
-                        <li>Sign up for a Skrill “Business account”. Do not use the same email you’ll be using for your real account.</li>
-                        <li>Sign up for a Skrill “Personal account”. Use a different email than the “Business account”. Do not use the same email you’ll be using for your real account.</li>
-                        <li>
-                            Contact Skrill and ask them to convert these 2 accounts to test accounts. It doesn’t need to be a long email. Just something simple like:<br>
-                            We need you to turn 2 accounts to test accounts:<br>
-                            “Buyer account”: <br>
-                            Email: buyer-email@example.com<br>
-                            Customer ID: 12456789<br>
-                            “Merchant account”: <br>
-                            Email: merchant-email@example.com<br>
-                            Customer ID: 98765421
-                        </li>
-                    </ul>
-                </div>
-
+                <p>
+                    For plugin configuration follow these steps:<br />
+                    <br />
+                    1. Create a merchant account at <a href="https://account.skrill.com/signup?rid=@Defaults.ReferralId" target="_blank">skrill.com</a><br />
+                    2. Go to <b>Settings > Developer Settings</b><br />
+                    3. Check the <b>Enable service</b> checkbox below the Automated Payments Interface (API) and Merchant Query Interface (MQI)<br />
+                    4. Change <b>MQI/API password</b>. You must use a separate password from the one used for your Skrill Digital Wallet. This ensures that you can change your Skrill Digital Wallet account without affecting the API or MQI<br />
+                    5. In the <b>Secret Word</b> field, enter your secret word. The following restrictions apply:<br />
+                    &emsp;• All characters must be in lower-case<br />
+                    &emsp;• The length should not exceed 10 characters<br />
+                    &emsp;• Special characters are not permitted<br />
+                    6. To apply your changes, click <b>Save</b><br />
+                    7. Fill in your credentials below<br />
+                    8. Save<br />
+                    <br />
+                    <em>Note: Ensure that you have configured your primary store currency that is supported by selected payment service provider.</em><br />
+                </p>
                 <div class="form-group">
                     <div class="col-md-3">
-                        <nop-override-store-checkbox asp-for="PayToEmail_OverrideForStore" asp-input="PayToEmail" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
-                        <nop-label asp-for="PayToEmail" />
+                        <nop-override-store-checkbox asp-for="MerchantEmail_OverrideForStore" asp-input="MerchantEmail" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-label asp-for="MerchantEmail" />
                     </div>
                     <div class="col-md-9">
-                        <nop-editor asp-for="PayToEmail" />
-                        <span asp-validation-for="PayToEmail"></span>
+                        <nop-editor asp-for="MerchantEmail" asp-required="true" />
+                        <span asp-validation-for="MerchantEmail"></span>
                     </div>
                 </div>
-
                 <div class="form-group">
                     <div class="col-md-3">
                         <nop-override-store-checkbox asp-for="SecretWord_OverrideForStore" asp-input="SecretWord" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
                         <nop-label asp-for="SecretWord" />
                     </div>
                     <div class="col-md-9">
-                        <nop-editor asp-for="SecretWord" />
+                        <nop-editor asp-for="SecretWord" asp-required="true" asp-value="@Model.SecretWord" />
                         <span asp-validation-for="SecretWord"></span>
                     </div>
                 </div>
-
                 <div class="form-group">
                     <div class="col-md-3">
-                        <nop-override-store-checkbox asp-for="AdditionalFee_OverrideForStore" asp-input="AdditionalFee" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
-                        <nop-label asp-for="AdditionalFee" />
+                        <nop-override-store-checkbox asp-for="Password_OverrideForStore" asp-input="Password" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-label asp-for="Password" />
                     </div>
                     <div class="col-md-9">
-                        <nop-editor asp-for="AdditionalFee" />
-                        <span asp-validation-for="AdditionalFee"></span>
+                        <nop-editor asp-for="Password" asp-value="@Model.Password" />
+                        <span asp-validation-for="Password"></span>
                     </div>
                 </div>
-
                 <div class="form-group">
-                    <div class="col-md-3">
-                        <nop-override-store-checkbox asp-for="AdditionalFeePercentage_OverrideForStore" asp-input="AdditionalFeePercentage" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
-                        <nop-label asp-for="AdditionalFeePercentage" />
-                    </div>
-                    <div class="col-md-9">
-                        <nop-editor asp-for="AdditionalFeePercentage" />
-                        <span asp-validation-for="AdditionalFeePercentage"></span>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <div class="col-md-3">
-                        &nbsp;
-                    </div>
-                    <div class="col-md-9">
-                        <input type="submit" name="save" class="btn bg-blue" value="@T("Admin.Common.Save")" />
+                    <div class="col-md-9 col-md-offset-3">
+                        <input type="submit" name="save" class="btn btn-primary" value="@T("Admin.Common.Save")" />
                     </div>
                 </div>
             </div>
