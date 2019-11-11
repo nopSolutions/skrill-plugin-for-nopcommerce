@@ -229,9 +229,9 @@ namespace Nop.Plugin.Payments.Skrill
             _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Skrill.Fields.MerchantEmail.Hint", "Enter email address of your Skrill merchant account.");
             _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Skrill.Fields.MerchantEmail.Required", "Merchant email is required");
             _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Skrill.Fields.Password", "API/MQI password");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Skrill.Fields.Password.Hint", "Enter your API/MQI password.");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Skrill.Fields.Password.Hint", "Insert API/MQI password created in your Skrill merchants account settings.");
             _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Skrill.Fields.SecretWord", "Secret word");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Skrill.Fields.SecretWord.Hint", "Enter your secret word.");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Skrill.Fields.SecretWord.Hint", "Insert secret word created in your Skrill merchants account settings.");
             _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Skrill.Fields.SecretWord.Required", "Secret word is required");
             _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Skrill.PaymentMethodDescription", "You will be redirected to Skrill to complete the payment");
             _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Skrill.Refund.Warning", "The refund is pending, actually it'll be completed upon receiving successful refund status report.");

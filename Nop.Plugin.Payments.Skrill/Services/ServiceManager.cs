@@ -412,8 +412,7 @@ namespace Nop.Plugin.Payments.Skrill.Services
 
                 //get encrypted string from the request message
                 var transactionId = !string.IsNullOrEmpty(form["transaction_id"].ToString()) ? form["transaction_id"] : form["mb_transaction_id"];
-                var encryptedString = ToMD5(form["merchant_id"] + transactionId + ToMD5(_settings.SecretWord).ToUpper()
-                    + form["mb_amount"] + form["mb_currency"] + form["status"]);
+                var encryptedString = ToMD5($"{form["merchant_id"]}{transactionId}{ToMD5(_settings.SecretWord).ToUpperInvariant()}{form["mb_amount"]}{form["mb_currency"]}{form["status"]}");
 
                 //equal this encrypted string with the received signature
                 if (!signature.ToString().Equals(encryptedString, StringComparison.InvariantCultureIgnoreCase))
