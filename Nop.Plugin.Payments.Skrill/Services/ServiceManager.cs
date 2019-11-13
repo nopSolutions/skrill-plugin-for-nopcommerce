@@ -208,10 +208,11 @@ namespace Nop.Plugin.Payments.Skrill.Services
                 ["prepare_only"] = "1", //first, prepare the order details
                 ["dynamic_descriptor "] = CommonHelper.EnsureMaximumLength(_storeContext.CurrentStore.Name, 25) ?? string.Empty,
                 //["sid"] = null, //used in the next request
-                ["rid"] = CommonHelper.EnsureMaximumLength(Defaults.ReferralId, 100) ?? string.Empty,
-                ["ext_ref_id"] = CommonHelper.EnsureMaximumLength(Defaults.UserAgent, 100) ?? string.Empty,
-                //["merchant_fields"] = "field1", //not used
-                //["field1"] = null, //not used
+                //["rid"] = CommonHelper.EnsureMaximumLength(Defaults.ReferralId, 100) ?? string.Empty, //according to Skrill managers "referral ID" should be passed in additional merchant fields, well ok
+                //["ext_ref_id"] = CommonHelper.EnsureMaximumLength(Defaults.UserAgent, 100) ?? string.Empty, //according to Skrill managers "referral ID" should be passed in additional merchant fields, well ok
+                ["merchant_fields"] = CommonHelper.EnsureMaximumLength("platform,platform_version", 240),
+                ["platform"] = CommonHelper.EnsureMaximumLength(Defaults.ReferralId, 240),
+                ["platform_version"] = CommonHelper.EnsureMaximumLength(NopVersion.CurrentVersion, 240),
 
                 //customer details
                 ["pay_from_email"] = CommonHelper.EnsureMaximumLength(billingAddress.Email, 100) ?? string.Empty,
