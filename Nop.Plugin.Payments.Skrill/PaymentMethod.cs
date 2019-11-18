@@ -70,7 +70,8 @@ namespace Nop.Plugin.Payments.Skrill
             var redirectUrl = _serviceManager.PrepareCheckoutUrl(postProcessPaymentRequest);
             if (string.IsNullOrEmpty(redirectUrl))
             {
-                redirectUrl = _urlHelperFactory.GetUrlHelper(_actionContextAccessor.ActionContext).RouteUrl(Defaults.OrderDetailsRouteName);
+                redirectUrl = _urlHelperFactory.GetUrlHelper(_actionContextAccessor.ActionContext)
+                    .RouteUrl(Defaults.OrderDetailsRouteName, new { orderId = postProcessPaymentRequest.Order.Id });
                 _notificationService.ErrorNotification("Something went wrong, contact the store manager");
             }
             _actionContextAccessor.ActionContext.HttpContext.Response.Redirect(redirectUrl);

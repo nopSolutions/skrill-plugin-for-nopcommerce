@@ -386,7 +386,17 @@ namespace Nop.Plugin.Payments.Skrill.Services
 
                 //whether the response contains bad request status codes (400, 401, etc)
                 if (response.StartsWith("4"))
+                {
+                    if (response.Contains("remote ip"))
+                    {
+                        //some special messages
+                        response = $"{response}{Environment.NewLine}You are trying to save Skrill credentials " +
+                            $"from unregistered IP address in your Skrill account. In order to complete the process, please login to your " +
+                            $"Skrill account >> Developer Settings and add your server IP in the MQI and API IP addresses.";
+                    }
+
                     throw new NopException(response);
+                }
 
                 //request is succeeded, so credentials are valid
                 return true;
