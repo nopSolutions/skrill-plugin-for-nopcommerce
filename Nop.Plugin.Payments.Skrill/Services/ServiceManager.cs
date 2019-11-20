@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.AspNetCore.WebUtilities;
+using Newtonsoft.Json;
 using Nop.Core;
 using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Directory;
@@ -304,10 +305,19 @@ namespace Nop.Plugin.Payments.Skrill.Services
             var (checkoutUrl, error) = HandleFunction(() =>
             {
                 //first prepare chackout and get session id
-                var url = PrepareCheckoutParameters(request);
-                var sessionId = _httpClient.GetAsync(url).Result;
+                var sessionRequestUrl = PrepareCheckoutParameters(request);
+                var sessionResponse = _httpClient.GetAsync(sessionRequestUrl).Result;
+                var sessionError = new { code = string.Empty, message = string.Empty };
+                try
+                {
+                    sessionError = JsonConvert.DeserializeAnonymousType(sessionResponse, sessionError);
+                }
+                catch { }
+                if (!string.IsNullOrEmpty(sessionError?.code))
+                    throw new NopException($"{sessionError.code} - {sessionError.message}");
 
                 //and now build URL to redirect
+                var sessionId = sessionResponse;
                 return QueryHelpers.AddQueryString(Defaults.QuickCheckoutServiceUrl, new Dictionary<string, string>
                 {
                     ["sid"] = CommonHelper.EnsureMaximumLength(sessionId, 32),
