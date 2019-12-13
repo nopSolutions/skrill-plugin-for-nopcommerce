@@ -61,5 +61,10 @@ namespace Nop.Plugin.Payments.Skrill
         /// Gets the webhook route name
         /// </summary>
         public static string RefundWebhookRouteName => "Plugin.Payments.Skrill.RefundWebhook";
+
+        /// <summary>
+        /// Gets a name of the view component to display refund hints
+        /// </summary>
+        public const string REFUND_HINTS_VIEW_COMPONENT_NAME = "SkrillRefundHints";
     }
 }

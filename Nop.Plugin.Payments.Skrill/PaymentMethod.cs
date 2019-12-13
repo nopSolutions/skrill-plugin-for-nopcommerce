@@ -1,23 +1,27 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Routing;
+using Nop.Core.Domain.Cms;
 using Nop.Core.Domain.Orders;
 using Nop.Core.Domain.Payments;
 using Nop.Plugin.Payments.Skrill.Services;
+using Nop.Services.Cms;
 using Nop.Services.Configuration;
 using Nop.Services.Localization;
 using Nop.Services.Messages;
 using Nop.Services.Payments;
 using Nop.Services.Plugins;
+using Nop.Web.Framework.Infrastructure;
 
 namespace Nop.Plugin.Payments.Skrill
 {
     /// <summary>
     /// Represents a payment method implementation
     /// </summary>
-    public class PaymentMethod : BasePlugin, IPaymentMethod
+    public class PaymentMethod : BasePlugin, IPaymentMethod, IWidgetPlugin
     {
         #region Fields
 
@@ -27,6 +31,7 @@ namespace Nop.Plugin.Payments.Skrill
         private readonly ISettingService _settingService;
         private readonly IUrlHelperFactory _urlHelperFactory;
         private readonly ServiceManager _serviceManager;
+        private readonly WidgetSettings _widgetSettings;
 
         #endregion
 
@@ -37,7 +42,8 @@ namespace Nop.Plugin.Payments.Skrill
             INotificationService notificationService,
             ISettingService settingService,
             IUrlHelperFactory urlHelperFactory,
-            ServiceManager serviceManager)
+            ServiceManager serviceManager,
+            WidgetSettings widgetSettings)
         {
             _actionContextAccessor = actionContextAccessor;
             _localizationService = localizationService;
@@ -45,6 +51,7 @@ namespace Nop.Plugin.Payments.Skrill
             _settingService = settingService;
             _urlHelperFactory = urlHelperFactory;
             _serviceManager = serviceManager;
+            _widgetSettings = widgetSettings;
         }
 
         #endregion
@@ -216,12 +223,43 @@ namespace Nop.Plugin.Payments.Skrill
         }
 
         /// <summary>
+        /// Gets widget zones where this widget should be rendered
+        /// </summary>
+        /// <returns>Widget zones</returns>
+        public IList<string> GetWidgetZones()
+        {
+            return new List<string> { AdminWidgetZones.OrderDetailsBlock };
+        }
+
+        /// <summary>
+        /// Gets a name of a view component for displaying widget
+        /// </summary>
+        /// <param name="widgetZone">Name of the widget zone</param>
+        /// <returns>View component name</returns>
+        public string GetWidgetViewComponentName(string widgetZone)
+        {
+            if (widgetZone == null)
+                throw new ArgumentNullException(nameof(widgetZone));
+
+            if (widgetZone.Equals(AdminWidgetZones.OrderDetailsBlock))
+                return Defaults.REFUND_HINTS_VIEW_COMPONENT_NAME;
+
+            return string.Empty;
+        }
+
+        /// <summary>
         /// Install the plugin
         /// </summary>
         public override void Install()
         {
             //settings
             _settingService.SaveSetting(new SkrillSettings());
+
+            if (!_widgetSettings.ActiveWidgetSystemNames.Contains(Defaults.SystemName))
+            {
+                _widgetSettings.ActiveWidgetSystemNames.Add(Defaults.SystemName);
+                _settingService.SaveSetting(_widgetSettings);
+            }
 
             //locales
             _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Skrill.Credentials.Valid", "Specified credentials are valid");
@@ -235,6 +273,7 @@ namespace Nop.Plugin.Payments.Skrill
             _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Skrill.Fields.SecretWord.Hint", "Insert secret word created in your Skrill merchants account settings.");
             _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Skrill.Fields.SecretWord.Required", "Secret word is required");
             _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Skrill.PaymentMethodDescription", "You will be redirected to Skrill to complete the payment");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Skrill.Refund.Offline.Hint", "This option only puts transactions which are refunded in Skrill merchant account in the same status (refunded) in your nopCommerce store.");
             _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Payments.Skrill.Refund.Warning", "The refund is pending, actually it'll be completed upon receiving successful refund status report.");
 
             base.Install();
@@ -246,6 +285,11 @@ namespace Nop.Plugin.Payments.Skrill
         public override void Uninstall()
         {
             //settings
+            if (_widgetSettings.ActiveWidgetSystemNames.Contains(Defaults.SystemName))
+            {
+                _widgetSettings.ActiveWidgetSystemNames.Remove(Defaults.SystemName);
+                _settingService.SaveSetting(_widgetSettings);
+            }
             _settingService.DeleteSetting<SkrillSettings>();
 
             //locales
@@ -260,6 +304,7 @@ namespace Nop.Plugin.Payments.Skrill
             _localizationService.DeletePluginLocaleResource("Plugins.Payments.Skrill.Fields.SecretWord.Hint");
             _localizationService.DeletePluginLocaleResource("Plugins.Payments.Skrill.Fields.SecretWord.Required");
             _localizationService.DeletePluginLocaleResource("Plugins.Payments.Skrill.PaymentMethodDescription");
+            _localizationService.DeletePluginLocaleResource("Plugins.Payments.Skrill.Refund.Offline.Hint");
             _localizationService.DeletePluginLocaleResource("Plugins.Payments.Skrill.Refund.Warning");
 
             base.Uninstall();
@@ -308,6 +353,11 @@ namespace Nop.Plugin.Payments.Skrill
         /// Gets a payment method description that will be displayed on checkout pages in the public store
         /// </summary>
         public string PaymentMethodDescription => _localizationService.GetResource("Plugins.Payments.Skrill.PaymentMethodDescription");
+
+        /// <summary>
+        /// Gets a value indicating whether to hide this plugin on the widget list page in the admin area
+        /// </summary>
+        public bool HideInWidgetList => true;
 
         #endregion
     }
