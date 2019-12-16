@@ -16,7 +16,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="logo.jpg" />
+    <None Remove="logo.png" />
     <None Remove="plugin.json" />
     <None Remove="Views\RefundHints.cshtml" />
     <None Remove="Views\_ViewImports.cshtml" />
@@ -24,7 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="logo.jpg">
+    <Content Include="logo.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="plugin.json">
