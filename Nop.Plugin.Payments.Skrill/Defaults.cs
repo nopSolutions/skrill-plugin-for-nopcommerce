@@ -38,6 +38,11 @@ namespace Nop.Plugin.Payments.Skrill
         public static string ReferralId => "124956815";
 
         /// <summary>
+        /// Gets the name of attribute to store unique refung identifier
+        /// </summary>
+        public static string RefundGuidAttribute => "SkrillRefundGuidAttribute";
+
+        /// <summary>
         /// Gets the configuration route name
         /// </summary>
         public static string ConfigurationRouteName => "Plugin.Payments.Skrill.Configure";

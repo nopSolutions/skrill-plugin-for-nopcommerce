@@ -272,6 +272,10 @@ namespace Nop.Plugin.Payments.Skrill.Services
             var urlHelper = _urlHelperFactory.GetUrlHelper(_actionContextAccessor.ActionContext);
             var webhookUrl = urlHelper.RouteUrl(Defaults.RefundWebhookRouteName, null, _webHelper.CurrentRequestProtocol);
 
+            //prepare unique refund identifier to avoid duplicated refunding
+            var refundGuid = Guid.NewGuid().ToString().ToLowerInvariant();
+            _genericAttributeService.SaveAttribute(refundedOrder, Defaults.RefundGuidAttribute, refundGuid);
+
             //prepare URL to request
             var url = QueryHelpers.AddQueryString(Defaults.RefundServiceUrl, new Dictionary<string, string>
             {
@@ -282,10 +286,10 @@ namespace Nop.Plugin.Payments.Skrill.Services
                 ["transaction_id"] = refundedOrder.CustomOrderNumber ?? string.Empty,
                 ["mb_transaction_id"] = refundedOrder.CaptureTransactionId ?? string.Empty,
                 ["amount"] = refundedAmount?.ToString("F").TrimEnd('0').TrimEnd('0').TrimEnd('.') ?? string.Empty,
+                ["merchant_fields"] = CommonHelper.EnsureMaximumLength("refund_guid", 240),
+                ["refund_guid"] = CommonHelper.EnsureMaximumLength(refundGuid, 240),
+                ["refund_status_url"] = webhookUrl ?? string.Empty,
                 //["refund_note"] = null, // not used
-                //["merchant_fields"] = "field1", //not used
-                //["field1"] = null, //not used
-                ["refund_status_url"] = webhookUrl ?? string.Empty
             });
 
             return url;

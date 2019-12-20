@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Nop.Core.Domain.Orders;
 using Nop.Plugin.Payments.Skrill.Domain;
 using Nop.Plugin.Payments.Skrill.Services;
+using Nop.Services.Common;
 using Nop.Services.Orders;
 using Nop.Web.Framework.Controllers;
 
@@ -13,6 +14,7 @@ namespace Nop.Plugin.Payments.Skrill.Controllers
     {
         #region Fields
 
+        private readonly IGenericAttributeService _genericAttributeService;
         private readonly IOrderProcessingService _orderProcessingService;
         private readonly IOrderService _orderService;
         private readonly ServiceManager _serviceManager;
@@ -21,10 +23,12 @@ namespace Nop.Plugin.Payments.Skrill.Controllers
 
         #region Ctor
 
-        public SkrillWebhookController(IOrderProcessingService orderProcessingService,
+        public SkrillWebhookController(IGenericAttributeService genericAttributeService,
+            IOrderProcessingService orderProcessingService,
             IOrderService orderService,
             ServiceManager serviceManager)
         {
+            _genericAttributeService = genericAttributeService;
             _orderProcessingService = orderProcessingService;
             _orderService = orderService;
             _serviceManager = serviceManager;
@@ -134,6 +138,11 @@ namespace Nop.Plugin.Payments.Skrill.Controllers
                 {
                     //refund processed
                     case "2":
+                        //ensure that this refund has not been processed before
+                        var refundGuid = _genericAttributeService.GetAttribute<string>(order, Defaults.RefundGuidAttribute);
+                        if (refundGuid?.Equals(Request.Form["refund_guid"], StringComparison.InvariantCultureIgnoreCase) ?? false)
+                            break;
+
                         if (decimal.TryParse(Request.Form["mb_amount"], out var refundedAmount) &&
                             _orderProcessingService.CanPartiallyRefundOffline(order, refundedAmount))
                         {
