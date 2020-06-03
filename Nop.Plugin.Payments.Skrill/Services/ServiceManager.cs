@@ -14,10 +14,12 @@ using Nop.Core;
 using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Directory;
 using Nop.Core.Domain.Orders;
+using Nop.Services.Catalog;
 using Nop.Services.Common;
 using Nop.Services.Directory;
 using Nop.Services.Localization;
 using Nop.Services.Logging;
+using Nop.Services.Orders;
 using Nop.Services.Payments;
 
 namespace Nop.Plugin.Payments.Skrill.Services
@@ -31,11 +33,16 @@ namespace Nop.Plugin.Payments.Skrill.Services
 
         private readonly CurrencySettings _currencySettings;
         private readonly IActionContextAccessor _actionContextAccessor;
+        private readonly IAddressService _addressService;
+        private readonly ICountryService _countryService;
         private readonly ICurrencyService _currencyService;
         private readonly IGenericAttributeService _genericAttributeService;
         private readonly ILanguageService _languageService;
         private readonly ILocalizationService _localizationService;
         private readonly ILogger _logger;
+        private readonly IProductService _productService;
+        private readonly IOrderService _orderService;
+        private readonly IStateProvinceService _stateProvinceService;
         private readonly IStoreContext _storeContext;
         private readonly IUrlHelperFactory _urlHelperFactory;
         private readonly IWebHelper _webHelper;
@@ -49,11 +56,16 @@ namespace Nop.Plugin.Payments.Skrill.Services
 
         public ServiceManager(CurrencySettings currencySettings,
             IActionContextAccessor actionContextAccessor,
+            IAddressService addressService,
+            ICountryService countryService,
             ICurrencyService currencyService,
             IGenericAttributeService genericAttributeService,
             ILanguageService languageService,
             ILocalizationService localizationService,
             ILogger logger,
+            IProductService productService,
+            IOrderService orderService,
+            IStateProvinceService stateProvinceService,
             IStoreContext storeContext,
             IUrlHelperFactory urlHelperFactory,
             IWebHelper webHelper,
@@ -63,11 +75,16 @@ namespace Nop.Plugin.Payments.Skrill.Services
         {
             _currencySettings = currencySettings;
             _actionContextAccessor = actionContextAccessor;
+            _addressService = addressService;
+            _countryService = countryService;
             _currencyService = currencyService;
             _genericAttributeService = genericAttributeService;
             _languageService = languageService;
             _localizationService = localizationService;
             _logger = logger;
+            _productService = productService;
+            _orderService = orderService;
+            _stateProvinceService = stateProvinceService;
             _storeContext = storeContext;
             _urlHelperFactory = urlHelperFactory;
             _webHelper = webHelper;
@@ -143,17 +160,26 @@ namespace Nop.Plugin.Payments.Skrill.Services
             if (order == null)
                 throw new NopException("Order is not set");
 
-            var customer = order.Customer;
-            if (customer == null)
+            var customerId = order.CustomerId;
+            if (customerId <= 0)
                 throw new NopException("Order customer is not set");
 
-            var billingAddress = order.BillingAddress;
+            var billingAddressId = order.BillingAddressId;
+            var billingAddress = _addressService.GetAddressById(billingAddressId);
             if (billingAddress == null)
                 throw new NopException("Order billing address is not set");
 
             var currency = _currencyService.GetCurrencyById(_currencySettings.PrimaryStoreCurrencyId);
             if (currency == null)
                 throw new NopException("Primary store currency is not set");
+
+            var billingCountryThreeLetterIsoCode = string.Empty;
+            if (billingAddress.CountryId.HasValue)
+                billingCountryThreeLetterIsoCode = _countryService.GetCountryById(billingAddress.CountryId.Value)?.ThreeLetterIsoCode;
+
+            var billingStateProvinceName = string.Empty;
+            if (billingAddress.StateProvinceId.HasValue)
+                billingStateProvinceName = _stateProvinceService.GetStateProvinceById(billingAddress.StateProvinceId.Value)?.Name;
 
             //prepare URLs
             var urlHelper = _urlHelperFactory.GetUrlHelper(_actionContextAccessor.ActionContext);
@@ -163,37 +189,11 @@ namespace Nop.Plugin.Payments.Skrill.Services
 
             //prepare some customer details
             var customerLanguage = _languageService.GetLanguageById(order.CustomerLanguageId) ?? _workContext.WorkingLanguage;
-            var dateOfBirthValue = _genericAttributeService.GetAttribute<string>(customer, NopCustomerDefaults.DateOfBirthAttribute);
+            var dateOfBirthValue = _genericAttributeService.GetAttribute<Customer, string>(customerId, NopCustomerDefaults.DateOfBirthAttribute);
             var customerDateOfBirth = DateTime.TryParse(dateOfBirthValue, out var dateOfBirth) ? dateOfBirth.ToString("ddMMyyyy") : string.Empty;
 
-            //prepare some item details
-            var item1 = order.OrderItems.FirstOrDefault();
-            var product1 = item1?.Product;
-            var detailDescription1 = "Product name:";
-            var detailText1 = product1 != null ? _localizationService.GetLocalized(product1, entity => entity.Name) : string.Empty;
-            var product2 = order.OrderItems.Skip(1).FirstOrDefault()?.Product;
-            var detailDescription2 = product2 != null ? detailDescription1 : "Product description:";
-            var detailText2 = product2 != null
-                ? _localizationService.GetLocalized(product2, entity => entity.Name)
-                : (product1 != null ? _localizationService.GetLocalized(product1, entity => entity.ShortDescription) : string.Empty);
-            var product3 = order.OrderItems.Skip(2).FirstOrDefault()?.Product;
-            var detailDescription3 = product3 != null ? detailDescription1 : (product2 != null ? string.Empty : "Quantity:");
-            var detailText3 = product3 != null
-                ? _localizationService.GetLocalized(product3, entity => entity.Name)
-                : (product2 != null
-                ? string.Empty
-                : item1?.Quantity.ToString());
-            var product4 = order.OrderItems.Skip(3).FirstOrDefault()?.Product;
-            var detailDescription4 = product4 != null ? detailDescription1 : string.Empty;
-            var detailText4 = product4 != null ? _localizationService.GetLocalized(product4, entity => entity.Name) : string.Empty;
-            var product5 = order.OrderItems.Skip(4).FirstOrDefault()?.Product;
-            var detailDescription5 = product5 != null ? detailDescription1 : string.Empty;
-            var detailText5 = product5 != null ? _localizationService.GetLocalized(product5, entity => entity.Name) : string.Empty;
-
-            //prepare URL to request
-            var url = QueryHelpers.AddQueryString(Defaults.QuickCheckoutServiceUrl, new Dictionary<string, string>
+            var query = new Dictionary<string, string>
             {
-                //merchant details
                 ["pay_to_email"] = CommonHelper.EnsureMaximumLength(_settings.MerchantEmail, 50) ?? string.Empty,
                 ["recipient_description"] = CommonHelper.EnsureMaximumLength(_storeContext.CurrentStore.Name, 30) ?? string.Empty,
                 ["transaction_id"] = CommonHelper.EnsureMaximumLength(order.CustomOrderNumber, 100) ?? string.Empty,
@@ -225,8 +225,8 @@ namespace Nop.Plugin.Payments.Skrill.Services
                 ["phone_number"] = CommonHelper.EnsureMaximumLength(billingAddress.PhoneNumber, 20) ?? string.Empty,
                 ["postal_code"] = CommonHelper.EnsureMaximumLength(billingAddress.ZipPostalCode, 9) ?? string.Empty,
                 ["city"] = CommonHelper.EnsureMaximumLength(billingAddress.City, 50) ?? string.Empty,
-                ["state"] = CommonHelper.EnsureMaximumLength(billingAddress.StateProvince?.Name, 50) ?? string.Empty,
-                ["country"] = CommonHelper.EnsureMaximumLength(billingAddress.Country?.ThreeLetterIsoCode, 3) ?? string.Empty,
+                ["state"] = CommonHelper.EnsureMaximumLength(billingStateProvinceName, 50) ?? string.Empty,
+                ["country"] = CommonHelper.EnsureMaximumLength(billingCountryThreeLetterIsoCode, 3) ?? string.Empty,
                 //["neteller_account"] = null, //not used
                 //["neteller_secure_id"] = null, // not used
 
@@ -239,17 +239,57 @@ namespace Nop.Plugin.Payments.Skrill.Services
                 ["amount3"] = CommonHelper.EnsureMaximumLength(order.OrderShippingExclTax.ToString("F").TrimEnd('0').TrimEnd('0').TrimEnd('.'), 19) ?? string.Empty,
                 ["amount4_description "] = CommonHelper.EnsureMaximumLength("Tax total:", 240) ?? string.Empty,
                 ["amount4"] = CommonHelper.EnsureMaximumLength(order.OrderTax.ToString("F").TrimEnd('0').TrimEnd('0').TrimEnd('.'), 19) ?? string.Empty,
-                ["detail1_description"] = CommonHelper.EnsureMaximumLength(detailDescription1, 240) ?? string.Empty,
-                ["detail1_text"] = CommonHelper.EnsureMaximumLength(detailText1, 240) ?? string.Empty,
-                ["detail2_description"] = CommonHelper.EnsureMaximumLength(detailDescription2, 240) ?? string.Empty,
-                ["detail2_text"] = CommonHelper.EnsureMaximumLength(detailText2, 240) ?? string.Empty,
-                ["detail3_description"] = CommonHelper.EnsureMaximumLength(detailDescription3, 240) ?? string.Empty,
-                ["detail3_text"] = CommonHelper.EnsureMaximumLength(detailText3, 240) ?? string.Empty,
-                ["detail4_description"] = CommonHelper.EnsureMaximumLength(detailDescription4, 240) ?? string.Empty,
-                ["detail4_text"] = CommonHelper.EnsureMaximumLength(detailText4, 240) ?? string.Empty,
-                ["detail5_description"] = CommonHelper.EnsureMaximumLength(detailDescription5, 240) ?? string.Empty,
-                ["detail5_text"] = CommonHelper.EnsureMaximumLength(detailText5, 240) ?? string.Empty
-            });
+            };
+
+            //prepare order items
+            var orderItems = _orderService.GetOrderItems(order.Id);
+            if (orderItems?.Any() == true)
+            {
+                var item1 = orderItems.FirstOrDefault();
+                var product1 = item1 != null ? _productService.GetProductById(item1.ProductId) : null;
+                var detailDescription1 = "Product name:";
+                var detailText1 = product1 != null ? _localizationService.GetLocalized(product1, entity => entity.Name) : string.Empty;
+
+                var item2 = orderItems.Skip(1).FirstOrDefault();
+                var product2 = item2 != null ? _productService.GetProductById(item2.ProductId) : null;
+                var detailDescription2 = product2 != null ? detailDescription1 : "Product description:";
+                var detailText2 = product2 != null
+                    ? _localizationService.GetLocalized(product2, entity => entity.Name)
+                    : (product1 != null ? _localizationService.GetLocalized(product1, entity => entity.ShortDescription) : string.Empty);
+
+                var item3 = orderItems.Skip(2).FirstOrDefault();
+                var product3 = item3 != null ? _productService.GetProductById(item3.ProductId) : null;
+                var detailDescription3 = product3 != null ? detailDescription1 : (product2 != null ? string.Empty : "Quantity:");
+                var detailText3 = product3 != null
+                    ? _localizationService.GetLocalized(product3, entity => entity.Name)
+                    : (product2 != null
+                    ? string.Empty
+                    : item1?.Quantity.ToString());
+
+                var item4 = orderItems.Skip(3).FirstOrDefault();
+                var product4 = item4 != null ? _productService.GetProductById(item4.ProductId) : null;
+                var detailDescription4 = product4 != null ? detailDescription1 : string.Empty;
+                var detailText4 = product4 != null ? _localizationService.GetLocalized(product4, entity => entity.Name) : string.Empty;
+
+                var item5 = orderItems.Skip(4).FirstOrDefault();
+                var product5 = item5 != null ? _productService.GetProductById(item5.ProductId) : null;
+                var detailDescription5 = product5 != null ? detailDescription1 : string.Empty;
+                var detailText5 = product5 != null ? _localizationService.GetLocalized(product5, entity => entity.Name) : string.Empty;
+
+                query["detail1_description"] = CommonHelper.EnsureMaximumLength(detailDescription1, 240) ?? string.Empty;
+                query["detail1_text"] = CommonHelper.EnsureMaximumLength(detailText1, 240) ?? string.Empty;
+                query["detail2_description"] = CommonHelper.EnsureMaximumLength(detailDescription2, 240) ?? string.Empty;
+                query["detail2_text"] = CommonHelper.EnsureMaximumLength(detailText2, 240) ?? string.Empty;
+                query["detail3_description"] = CommonHelper.EnsureMaximumLength(detailDescription3, 240) ?? string.Empty;
+                query["detail3_text"] = CommonHelper.EnsureMaximumLength(detailText3, 240) ?? string.Empty;
+                query["detail4_description"] = CommonHelper.EnsureMaximumLength(detailDescription4, 240) ?? string.Empty;
+                query["detail4_text"] = CommonHelper.EnsureMaximumLength(detailText4, 240) ?? string.Empty;
+                query["detail5_description"] = CommonHelper.EnsureMaximumLength(detailDescription5, 240) ?? string.Empty;
+                query["detail5_text"] = CommonHelper.EnsureMaximumLength(detailText5, 240) ?? string.Empty;
+            }
+            
+            //prepare URL to request
+            var url = QueryHelpers.AddQueryString(Defaults.QuickCheckoutServiceUrl, query);
 
             return url;
         }

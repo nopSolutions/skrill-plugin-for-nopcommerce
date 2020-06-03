@@ -15,11 +15,10 @@ using Nop.Web.Framework.Security;
 namespace Nop.Plugin.Payments.Skrill.Controllers
 {
     [Area(AreaNames.Admin)]
-    [HttpsRequirement(SslRequirement.Yes)]
-    [AdminAntiForgery]
     [ValidateIpAddress]
     [AuthorizeAdmin]
     [ValidateVendor]
+    [AutoValidateAntiforgeryToken]
     public class SkrillController : BasePluginController
     {
         #region Fields

@@ -13,16 +13,16 @@ namespace Nop.Plugin.Payments.Skrill.Infrastructure
         /// <summary>
         /// Register routes
         /// </summary>
-        /// <param name="routeBuilder">Route builder</param>
-        public void RegisterRoutes(IRouteBuilder routeBuilder)
+        /// <param name="endpointRouteBuilder">Route builder</param>
+        public void RegisterRoutes(IEndpointRouteBuilder endpointRouteBuilder)
         {
-            routeBuilder.MapRoute(Defaults.ConfigurationRouteName, "Plugins/Skrill/Configure",
+            endpointRouteBuilder.MapControllerRoute(Defaults.ConfigurationRouteName, "Plugins/Skrill/Configure",
                 new { controller = "Skrill", action = "Configure", area = AreaNames.Admin });
 
-            routeBuilder.MapRoute(Defaults.QuickCheckoutWebhookRouteName, "Plugins/Skrill/QuickCheckoutWebhook",
+            endpointRouteBuilder.MapControllerRoute(Defaults.QuickCheckoutWebhookRouteName, "Plugins/Skrill/QuickCheckoutWebhook",
                 new { controller = "SkrillWebhook", action = "QuickCheckoutWebhook" });
 
-            routeBuilder.MapRoute(Defaults.RefundWebhookRouteName, "Plugins/Skrill/RefundWebhook",
+            endpointRouteBuilder.MapControllerRoute(Defaults.RefundWebhookRouteName, "Plugins/Skrill/RefundWebhook",
                 new { controller = "SkrillWebhook", action = "RefundWebhook" });
         }
 

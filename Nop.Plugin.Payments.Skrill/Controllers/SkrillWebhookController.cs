@@ -55,13 +55,12 @@ namespace Nop.Plugin.Payments.Skrill.Controllers
 
                 //add order note
                 var details = Request.Form.Aggregate(string.Empty, (message, parameter) => $"{message}{parameter.Key}: {parameter.Value}; ");
-                order.OrderNotes.Add(new OrderNote
+                _orderService.InsertOrderNote(new OrderNote
                 {
                     Note = $"Webhook details: {Environment.NewLine}{details}",
                     DisplayToCustomer = false,
                     CreatedOnUtc = DateTime.UtcNow
                 });
-                _orderService.UpdateOrder(order);
 
                 //check transaction status
                 switch (Request.Form["status"].ToString().ToLower())
@@ -72,13 +71,12 @@ namespace Nop.Plugin.Payments.Skrill.Controllers
                     case "-1":
                         if (Enum.TryParse<FailedReasonCode>(Request.Form["failed_reason_code"], out var failedReason))
                         {
-                            order.OrderNotes.Add(new OrderNote
+                            _orderService.InsertOrderNote(new OrderNote
                             {
                                 Note = $"Order cancelled. Reason: {failedReason.ToString()}",
                                 DisplayToCustomer = false,
                                 CreatedOnUtc = DateTime.UtcNow
                             });
-                            _orderService.UpdateOrder(order);
                         }
                         if (_orderProcessingService.CanCancelOrder(order))
                             _orderProcessingService.CancelOrder(order, true);
@@ -125,13 +123,12 @@ namespace Nop.Plugin.Payments.Skrill.Controllers
 
                 //add order note
                 var details = Request.Form.Aggregate(string.Empty, (message, parameter) => $"{message}{parameter.Key}: {parameter.Value}; ");
-                order.OrderNotes.Add(new OrderNote
+                _orderService.InsertOrderNote(new OrderNote
                 {
                     Note = $"Webhook details: {Environment.NewLine}{details}",
                     DisplayToCustomer = false,
                     CreatedOnUtc = DateTime.UtcNow
                 });
-                _orderService.UpdateOrder(order);
 
                 //check transaction status
                 switch (Request.Form["status"].ToString().ToLower())
