@@ -43,6 +43,11 @@ namespace Nop.Plugin.Payments.Skrill
         public static string RefundGuidAttribute => "SkrillRefundGuidAttribute";
 
         /// <summary>
+        /// Gets the name of attribute to store unique transaction identifier
+        /// </summary>
+        public static string PaymentTransactionIdAttribute => "SkrillPaymentTransactionIdAttribute";
+
+        /// <summary>
         /// Gets the configuration route name
         /// </summary>
         public static string ConfigurationRouteName => "Plugin.Payments.Skrill.Configure";
@@ -58,6 +63,11 @@ namespace Nop.Plugin.Payments.Skrill
         public static string OrderDetailsRouteName => "OrderDetails";
 
         /// <summary>
+        /// Gets the order paid webhook route name
+        /// </summary>
+        public static string OrderPaidWebhookRouteName => "Plugin.Payments.Skrill.OrderPaidWebhook";
+
+        /// <summary>
         /// Gets the webhook route name
         /// </summary>
         public static string QuickCheckoutWebhookRouteName => "Plugin.Payments.Skrill.QuickCheckoutWebhook";
@@ -71,5 +81,15 @@ namespace Nop.Plugin.Payments.Skrill
         /// Gets a name of the view component to display refund hints
         /// </summary>
         public const string REFUND_HINTS_VIEW_COMPONENT_NAME = "SkrillRefundHints";
+
+        /// <summary>
+        /// Gets a name of the view component to display payment info
+        /// </summary>
+        public const string PAYMENT_INFO_VIEW_COMPONENT_NAME = "SkrillPaymentInfo";
+
+        /// <summary>
+        /// Gets the session key to get process payment request
+        /// </summary>
+        public static string PaymentRequestSessionKey => "OrderPaymentInfo";
     }
 }

@@ -1,0 +1,42 @@
+﻿@model string
+
+@{
+    Layout = "";
+}
+<style>
+    .skrill-payment-iframe {
+        height: 750px;
+        width: 100%;
+    }
+</style>
+
+<div class="skrill-payment-container">
+    <iframe src="@Model" class="skrill-payment-iframe" frameborder="0">
+        <p>Your browser does not support iframes.</p>
+    </iframe>
+</div>
+
+<script asp-location="Footer">
+    $(document).ready(function () {
+        $('input.payment-info-next-step-button').hide();
+        $('.skrill-payment-iframe').on('load', function () {
+            var $body = $(this).contents().find('body');
+            if ($body.length <= 0)
+                return;
+
+            var status = $body.text();
+            if (status === 'Ok') {
+                $('.skrill-payment-container').html($('<span/>').text('@T("Plugins.Payments.Skrill.Payment.Successful")'))
+                $('input.payment-info-next-step-button').show();
+                $('input.payment-info-next-step-button').click();
+            } else {
+                $('.skrill-payment-container').html($('<span/>').text('@T("Plugins.Payments.Skrill.Payment.Invalid")'))
+            }
+        });
+    });
+</script>
+
+@if (orderSettings.OnePageCheckoutEnabled)
+{
+    @Html.NopInlineScripts(ResourceLocation.Footer)
+}

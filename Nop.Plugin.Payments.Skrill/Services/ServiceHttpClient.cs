@@ -18,10 +18,10 @@ namespace Nop.Plugin.Payments.Skrill.Services
 
         #region Ctor
 
-        public ServiceHttpClient(HttpClient client)
+        public ServiceHttpClient(HttpClient client, SkrillSettings settings)
         {
             //configure client
-            client.Timeout = TimeSpan.FromMilliseconds(10000);
+            client.Timeout = TimeSpan.FromSeconds(settings.RequestTimeout ?? 10);
             client.DefaultRequestHeaders.Add(HeaderNames.UserAgent, Defaults.UserAgent);
             client.DefaultRequestHeaders.Add(HeaderNames.Accept, "*/*");
 

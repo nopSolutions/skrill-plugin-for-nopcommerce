@@ -1,8 +1,10 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Nop.Core;
 using Nop.Core.Infrastructure;
+using Nop.Plugin.Payments.Skrill.Domain;
 using Nop.Plugin.Payments.Skrill.Models;
 using Nop.Plugin.Payments.Skrill.Services;
+using Nop.Services;
 using Nop.Services.Configuration;
 using Nop.Services.Localization;
 using Nop.Services.Messages;
@@ -10,7 +12,6 @@ using Nop.Services.Security;
 using Nop.Web.Framework;
 using Nop.Web.Framework.Controllers;
 using Nop.Web.Framework.Mvc.Filters;
-using Nop.Web.Framework.Security;
 
 namespace Nop.Plugin.Payments.Skrill.Controllers
 {
@@ -19,7 +20,7 @@ namespace Nop.Plugin.Payments.Skrill.Controllers
     [AuthorizeAdmin]
     [ValidateVendor]
     [AutoValidateAntiforgeryToken]
-    public class SkrillController : BasePluginController
+    public class SkrillController : BasePaymentController
     {
         #region Fields
 
@@ -65,7 +66,9 @@ namespace Nop.Plugin.Payments.Skrill.Controllers
                 MerchantEmail = settings.MerchantEmail,
                 SecretWord = settings.SecretWord,
                 Password = settings.Password,
-                ActiveStoreScopeConfiguration = storeScope
+                ActiveStoreScopeConfiguration = storeScope,
+                PaymentFlowTypeId = (int)settings.PaymentFlowType,
+                PaymentFlowTypes = settings.PaymentFlowType.ToSelectList()
             };
 
             if (storeScope > 0)
@@ -73,6 +76,7 @@ namespace Nop.Plugin.Payments.Skrill.Controllers
                 model.MerchantEmail_OverrideForStore = _settingService.SettingExists(settings, setting => setting.MerchantEmail, storeScope);
                 model.SecretWord_OverrideForStore = _settingService.SettingExists(settings, setting => setting.SecretWord, storeScope);
                 model.Password_OverrideForStore = _settingService.SettingExists(settings, setting => setting.Password, storeScope);
+                model.PaymentFlowTypeId_OverrideForStore = _settingService.SettingExists(settings, setting => setting.PaymentFlowType, storeScope);
             }
 
             return View("~/Plugins/Payments.Skrill/Views/Configure.cshtml", model);
@@ -94,12 +98,13 @@ namespace Nop.Plugin.Payments.Skrill.Controllers
             settings.MerchantEmail = model.MerchantEmail;
             settings.SecretWord = model.SecretWord;
             settings.Password = model.Password;
-            _settingService.SaveSetting(settings);
+            settings.PaymentFlowType = (PaymentFlowType)model.PaymentFlowTypeId;
 
             //save settings
             _settingService.SaveSettingOverridablePerStore(settings, setting => setting.MerchantEmail, model.MerchantEmail_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(settings, setting => setting.SecretWord, model.SecretWord_OverrideForStore, storeScope, false);
             _settingService.SaveSettingOverridablePerStore(settings, setting => setting.Password, model.Password_OverrideForStore, storeScope, false);
+            _settingService.SaveSettingOverridablePerStore(settings, setting => setting.PaymentFlowType, model.PaymentFlowTypeId_OverrideForStore, storeScope, false);
             _settingService.ClearCache();
 
             _notificationService.SuccessNotification(_localizationService.GetResource("Admin.Plugins.Saved"));

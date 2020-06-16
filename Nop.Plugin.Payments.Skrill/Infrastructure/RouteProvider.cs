@@ -19,6 +19,9 @@ namespace Nop.Plugin.Payments.Skrill.Infrastructure
             endpointRouteBuilder.MapControllerRoute(Defaults.ConfigurationRouteName, "Plugins/Skrill/Configure",
                 new { controller = "Skrill", action = "Configure", area = AreaNames.Admin });
 
+            endpointRouteBuilder.MapControllerRoute(Defaults.OrderPaidWebhookRouteName, "Plugins/Skrill/OrderPaidWebhook",
+                new { controller = "SkrillWebhook", action = "OrderPaidWebhook" });
+
             endpointRouteBuilder.MapControllerRoute(Defaults.QuickCheckoutWebhookRouteName, "Plugins/Skrill/QuickCheckoutWebhook",
                 new { controller = "SkrillWebhook", action = "QuickCheckoutWebhook" });
 
