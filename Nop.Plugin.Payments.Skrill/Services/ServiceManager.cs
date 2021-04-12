@@ -4,6 +4,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.Xml.Linq;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -124,8 +125,11 @@ namespace Nop.Plugin.Payments.Skrill.Services
         /// </summary>
         /// <typeparam name="TResult">Result type</typeparam>
         /// <param name="function">Function</param>
-        /// <returns>Result; error message if exists</returns>
-        private (TResult Result, string ErrorMessage) HandleFunction<TResult>(Func<TResult> function)
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains the result; error message if exists
+        /// </returns>
+        private async Task<(TResult Result, string ErrorMessage)> HandleFunctionAsync<TResult>(Func<TResult> function)
         {
             try
             {
@@ -140,7 +144,7 @@ namespace Nop.Plugin.Payments.Skrill.Services
             {
                 //log errors
                 var errorMessage = $"{Defaults.SystemName} error: {Environment.NewLine}{exception.Message}";
-                _logger.Error(errorMessage, exception, _workContext.CurrentCustomer);
+                await _logger.ErrorAsync(errorMessage, exception, await _workContext.GetCurrentCustomerAsync());
 
                 return (default, errorMessage);
             }
@@ -165,86 +169,90 @@ namespace Nop.Plugin.Payments.Skrill.Services
         /// Prepare parameters to request the Quick Checkout service
         /// </summary>
         /// <param name="request">Payment info required for an order processing</param>
-        /// <returns>URL to request</returns>
-        private string PrepareSessionRequestUrl(PostProcessPaymentRequest request)
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains URL to request
+        /// </returns>
+        private async Task<string> PrepareSessionRequestUrlAsync(PostProcessPaymentRequest request)
         {
             var order = request.Order;
             if (order == null)
                 throw new NopException("Order is not set");
 
-            var customer = _customerService.GetCustomerById(order.CustomerId);
+            var customer = await _customerService.GetCustomerByIdAsync(order.CustomerId);
             if (customer == null)
                 throw new NopException("Order customer is not set");
 
-            var billingAddress = _addressService.GetAddressById(order.BillingAddressId);
+            var billingAddress = await _addressService.GetAddressByIdAsync(order.BillingAddressId);
             if (billingAddress == null)
                 throw new NopException("Order billing address is not set");
 
             var billingCountryThreeLetterIsoCode = string.Empty;
             if (billingAddress.CountryId.HasValue)
-                billingCountryThreeLetterIsoCode = _countryService.GetCountryById(billingAddress.CountryId.Value)?.ThreeLetterIsoCode;
+                billingCountryThreeLetterIsoCode = (await _countryService.GetCountryByIdAsync(billingAddress.CountryId.Value))?.ThreeLetterIsoCode;
 
             var billingStateProvinceName = string.Empty;
             if (billingAddress.StateProvinceId.HasValue)
-                billingStateProvinceName = _stateProvinceService.GetStateProvinceById(billingAddress.StateProvinceId.Value)?.Name;
+                billingStateProvinceName = (await _stateProvinceService.GetStateProvinceByIdAsync(billingAddress.StateProvinceId.Value))?.Name;
 
-            var currency = _currencyService.GetCurrencyById(_currencySettings.PrimaryStoreCurrencyId);
+            var currency = await _currencyService.GetCurrencyByIdAsync(_currencySettings.PrimaryStoreCurrencyId);
             if (currency == null)
                 throw new NopException("Primary store currency is not set");
 
             //prepare URLs
             var urlHelper = _urlHelperFactory.GetUrlHelper(_actionContextAccessor.ActionContext);
-            var successUrl = urlHelper.RouteUrl(Defaults.CheckoutCompletedRouteName, new { orderId = order.Id }, _webHelper.CurrentRequestProtocol);
-            var failUrl = urlHelper.RouteUrl(Defaults.OrderDetailsRouteName, new { orderId = order.Id }, _webHelper.CurrentRequestProtocol);
-            var webhookUrl = urlHelper.RouteUrl(Defaults.QuickCheckoutWebhookRouteName, null, _webHelper.CurrentRequestProtocol);
+            var successUrl = urlHelper.RouteUrl(Defaults.CheckoutCompletedRouteName, new { orderId = order.Id }, _webHelper.GetCurrentRequestProtocol());
+            var failUrl = urlHelper.RouteUrl(Defaults.OrderDetailsRouteName, new { orderId = order.Id }, _webHelper.GetCurrentRequestProtocol());
+            var webhookUrl = urlHelper.RouteUrl(Defaults.QuickCheckoutWebhookRouteName, null, _webHelper.GetCurrentRequestProtocol());
 
             //prepare some customer details
-            var customerLanguage = _languageService.GetLanguageById(order.CustomerLanguageId) ?? _workContext.WorkingLanguage;
-            var dateOfBirthValue = _genericAttributeService.GetAttribute<string>(customer, NopCustomerDefaults.DateOfBirthAttribute);
+            var customerLanguage = await _languageService.GetLanguageByIdAsync(order.CustomerLanguageId) ?? await _workContext.GetWorkingLanguageAsync();
+            var dateOfBirthValue = await _genericAttributeService.GetAttributeAsync<string>(customer, NopCustomerDefaults.DateOfBirthAttribute);
             var customerDateOfBirth = DateTime.TryParse(dateOfBirthValue, out var dateOfBirth) ? dateOfBirth.ToString("ddMMyyyy") : string.Empty;
 
             //prepare some item details
-            var orderItems = _orderService.GetOrderItems(order.Id);
+            var orderItems = await _orderService.GetOrderItemsAsync(order.Id);
             var item1 = orderItems.FirstOrDefault();
-            var product1 = item1 != null ? _productService.GetProductById(item1.ProductId) : null;
+            var product1 = item1 != null ? await _productService.GetProductByIdAsync(item1.ProductId) : null;
             var detailDescription1 = "Product name:";
-            var detailText1 = product1 != null ? _localizationService.GetLocalized(product1, entity => entity.Name) : string.Empty;
+            var detailText1 = product1 != null ? await _localizationService.GetLocalizedAsync(product1, entity => entity.Name) : string.Empty;
 
             var item2 = orderItems.Skip(1).FirstOrDefault();
-            var product2 = item2 != null ? _productService.GetProductById(item2.ProductId) : null;
+            var product2 = item2 != null ? await _productService.GetProductByIdAsync(item2.ProductId) : null;
             var detailDescription2 = product2 != null ? detailDescription1 : "Product description:";
             var detailText2 = product2 != null
-                ? _localizationService.GetLocalized(product2, entity => entity.Name)
-                : (product1 != null ? _localizationService.GetLocalized(product1, entity => entity.ShortDescription) : string.Empty);
+                ? await _localizationService.GetLocalizedAsync(product2, entity => entity.Name)
+                : (product1 != null ? await _localizationService.GetLocalizedAsync(product1, entity => entity.ShortDescription) : string.Empty);
 
             var item3 = orderItems.Skip(2).FirstOrDefault();
-            var product3 = item3 != null ? _productService.GetProductById(item3.ProductId) : null;
+            var product3 = item3 != null ? await _productService.GetProductByIdAsync(item3.ProductId) : null;
             var detailDescription3 = product3 != null ? detailDescription1 : (product2 != null ? string.Empty : "Quantity:");
             var detailText3 = product3 != null
-                ? _localizationService.GetLocalized(product3, entity => entity.Name)
+                ? await _localizationService.GetLocalizedAsync(product3, entity => entity.Name)
                 : (product2 != null
                 ? string.Empty
                 : item1?.Quantity.ToString());
 
             var item4 = orderItems.Skip(3).FirstOrDefault();
-            var product4 = item4 != null ? _productService.GetProductById(item4.ProductId) : null;
+            var product4 = item4 != null ? await _productService.GetProductByIdAsync(item4.ProductId) : null;
             var detailDescription4 = product4 != null ? detailDescription1 : string.Empty;
-            var detailText4 = product4 != null ? _localizationService.GetLocalized(product4, entity => entity.Name) : string.Empty;
+            var detailText4 = product4 != null ? await _localizationService.GetLocalizedAsync(product4, entity => entity.Name) : string.Empty;
 
             var item5 = orderItems.Skip(4).FirstOrDefault();
-            var product5 = item5 != null ? _productService.GetProductById(item5.ProductId) : null;
+            var product5 = item5 != null ? await _productService.GetProductByIdAsync(item5.ProductId) : null;
             var detailDescription5 = product5 != null ? detailDescription1 : string.Empty;
-            var detailText5 = product5 != null ? _localizationService.GetLocalized(product5, entity => entity.Name) : string.Empty;
+            var detailText5 = product5 != null ? await _localizationService.GetLocalizedAsync(product5, entity => entity.Name) : string.Empty;
 
+            var store = await _storeContext.GetCurrentStoreAsync();
             //prepare URL to request
             var url = QueryHelpers.AddQueryString(Defaults.QuickCheckoutServiceUrl, new Dictionary<string, string>
             {
                 //merchant details
                 ["pay_to_email"] = CommonHelper.EnsureMaximumLength(_settings.MerchantEmail, 50) ?? string.Empty,
-                ["recipient_description"] = CommonHelper.EnsureMaximumLength(_storeContext.CurrentStore.Name, 30) ?? string.Empty,
+                ["recipient_description"] = CommonHelper.EnsureMaximumLength(store.Name, 30) ?? string.Empty,
                 ["transaction_id"] = order.OrderGuid.ToString(),
                 ["return_url"] = CommonHelper.EnsureMaximumLength(successUrl, 240) ?? string.Empty,
-                ["return_url_text"] = CommonHelper.EnsureMaximumLength($"Back to {_storeContext.CurrentStore.Name}", 35) ?? string.Empty,
+                ["return_url_text"] = CommonHelper.EnsureMaximumLength($"Back to {store.Name}", 35) ?? string.Empty,
                 //["return_url_target"] = "1", //default value
                 ["cancel_url"] = CommonHelper.EnsureMaximumLength(failUrl, 240) ?? string.Empty,
                 //["cancel_url_target"] = "1", //default value
@@ -253,13 +261,13 @@ namespace Nop.Plugin.Payments.Skrill.Services
                 ["language"] = CommonHelper.EnsureMaximumLength(customerLanguage?.UniqueSeoCode ?? "EN", 2) ?? string.Empty,
                 //["logo_url"] = null, //not used, only store name will be shown
                 ["prepare_only"] = "1", //first, prepare the order details
-                ["dynamic_descriptor "] = CommonHelper.EnsureMaximumLength(_storeContext.CurrentStore.Name, 25) ?? string.Empty,
+                ["dynamic_descriptor "] = CommonHelper.EnsureMaximumLength(store.Name, 25) ?? string.Empty,
                 //["sid"] = null, //used in the next request
                 //["rid"] = CommonHelper.EnsureMaximumLength(Defaults.ReferralId, 100) ?? string.Empty, //according to Skrill managers "referral ID" should be passed in additional merchant fields, well ok
                 //["ext_ref_id"] = CommonHelper.EnsureMaximumLength(Defaults.UserAgent, 100) ?? string.Empty, //according to Skrill managers "referral ID" should be passed in additional merchant fields, well ok
                 ["merchant_fields"] = CommonHelper.EnsureMaximumLength("platform,platform_version", 240),
                 ["platform"] = CommonHelper.EnsureMaximumLength(Defaults.ReferralId, 240),
-                ["platform_version"] = CommonHelper.EnsureMaximumLength(NopVersion.CurrentVersion, 240),
+                ["platform_version"] = CommonHelper.EnsureMaximumLength(NopVersion.CURRENT_VERSION, 240),
 
                 //customer details
                 ["pay_from_email"] = CommonHelper.EnsureMaximumLength(billingAddress.Email, 100) ?? string.Empty,
@@ -304,88 +312,92 @@ namespace Nop.Plugin.Payments.Skrill.Services
         /// Prepare parameters to request the Quick Checkout service
         /// </summary>
         /// <param name="orderGuid">Order GUID</param>
-        /// <returns>URL to request</returns>
-        private string PrepareSessionRequestUrl(Guid orderGuid)
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains URL to request
+        /// </returns>
+        private async Task<string> PrepareSessionRequestUrlAsync(Guid orderGuid)
         {
-            var customer = _workContext.CurrentCustomer;
+            var customer = await _workContext.GetCurrentCustomerAsync();
 
-            var billingAddress = _customerService.GetCustomerBillingAddress(customer);
+            var billingAddress = await _customerService.GetCustomerBillingAddressAsync(customer);
             if (billingAddress == null)
                 throw new NopException("Order billing address is not set");
 
-            var currency = _currencyService.GetCurrencyById(_currencySettings.PrimaryStoreCurrencyId);
+            var currency = await _currencyService.GetCurrencyByIdAsync(_currencySettings.PrimaryStoreCurrencyId);
             if (currency == null)
                 throw new NopException("Primary store currency is not set");
 
             var billingCountryThreeLetterIsoCode = string.Empty;
             if (billingAddress.CountryId.HasValue)
-                billingCountryThreeLetterIsoCode = _countryService.GetCountryById(billingAddress.CountryId.Value)?.ThreeLetterIsoCode;
+                billingCountryThreeLetterIsoCode = (await _countryService.GetCountryByIdAsync(billingAddress.CountryId.Value))?.ThreeLetterIsoCode;
 
             var billingStateProvinceName = string.Empty;
             if (billingAddress.StateProvinceId.HasValue)
-                billingStateProvinceName = _stateProvinceService.GetStateProvinceById(billingAddress.StateProvinceId.Value)?.Name;
+                billingStateProvinceName = (await _stateProvinceService.GetStateProvinceByIdAsync(billingAddress.StateProvinceId.Value))?.Name;
 
             //prepare URLs
             var urlHelper = _urlHelperFactory.GetUrlHelper(_actionContextAccessor.ActionContext);
-            var successUrl = urlHelper.RouteUrl(Defaults.OrderPaidWebhookRouteName, null, _webHelper.CurrentRequestProtocol);
-            var webhookUrl = urlHelper.RouteUrl(Defaults.QuickCheckoutWebhookRouteName, null, _webHelper.CurrentRequestProtocol);
+            var successUrl = urlHelper.RouteUrl(Defaults.OrderPaidWebhookRouteName, null, _webHelper.GetCurrentRequestProtocol());
+            var webhookUrl = urlHelper.RouteUrl(Defaults.QuickCheckoutWebhookRouteName, null, _webHelper.GetCurrentRequestProtocol());
 
             //prepare some customer details
-            var customerLanguage = _workContext.WorkingLanguage;
-            var dateOfBirthValue = _genericAttributeService.GetAttribute<string>(customer, NopCustomerDefaults.DateOfBirthAttribute);
+            var customerLanguage = await _workContext.GetWorkingLanguageAsync();
+            var dateOfBirthValue = await _genericAttributeService.GetAttributeAsync<string>(customer, NopCustomerDefaults.DateOfBirthAttribute);
             var customerDateOfBirth = DateTime.TryParse(dateOfBirthValue, out var dateOfBirth) ? dateOfBirth.ToString("ddMMyyyy") : string.Empty;
 
-            var cart = _shoppingCartService.GetShoppingCart(customer, ShoppingCartType.ShoppingCart, _storeContext.CurrentStore.Id);
-            var orderTotal = _orderTotalCalculationService.GetShoppingCartTotal(cart, usePaymentMethodAdditionalFee: false) ?? decimal.Zero;
+            var store = await _storeContext.GetCurrentStoreAsync();
+            var cart = await _shoppingCartService.GetShoppingCartAsync(customer, ShoppingCartType.ShoppingCart, store.Id);
+            var orderTotal = (await _orderTotalCalculationService.GetShoppingCartTotalAsync(cart, usePaymentMethodAdditionalFee: false)).shoppingCartTotal ?? decimal.Zero;
 
             var item1 = cart.FirstOrDefault();
-            var product1 = item1 != null ? _productService.GetProductById(item1.ProductId) : null;
+            var product1 = item1 != null ? await _productService.GetProductByIdAsync(item1.ProductId) : null;
             var detailDescription1 = "Product name:";
-            var detailText1 = product1 != null ? _localizationService.GetLocalized(product1, entity => entity.Name) : string.Empty;
+            var detailText1 = product1 != null ? await _localizationService.GetLocalizedAsync(product1, entity => entity.Name) : string.Empty;
 
             var item2 = cart.Skip(1).FirstOrDefault();
-            var product2 = item2 != null ? _productService.GetProductById(item2.ProductId) : null;
+            var product2 = item2 != null ? await _productService.GetProductByIdAsync(item2.ProductId) : null;
             var detailDescription2 = product2 != null ? detailDescription1 : "Product description:";
             var detailText2 = product2 != null
-                ? _localizationService.GetLocalized(product2, entity => entity.Name)
-                : (product1 != null ? _localizationService.GetLocalized(product1, entity => entity.ShortDescription) : string.Empty);
+                ? await _localizationService.GetLocalizedAsync(product2, entity => entity.Name)
+                : (product1 != null ? await _localizationService.GetLocalizedAsync(product1, entity => entity.ShortDescription) : string.Empty);
 
             var item3 = cart.Skip(2).FirstOrDefault();
-            var product3 = item3 != null ? _productService.GetProductById(item3.ProductId) : null;
+            var product3 = item3 != null ? await _productService.GetProductByIdAsync(item3.ProductId) : null;
             var detailDescription3 = product3 != null ? detailDescription1 : (product2 != null ? string.Empty : "Quantity:");
             var detailText3 = product3 != null
-                ? _localizationService.GetLocalized(product3, entity => entity.Name)
+                ? await _localizationService.GetLocalizedAsync(product3, entity => entity.Name)
                 : (product2 != null
                 ? string.Empty
                 : item1?.Quantity.ToString());
 
             var item4 = cart.Skip(3).FirstOrDefault();
-            var product4 = item4 != null ? _productService.GetProductById(item4.ProductId) : null;
+            var product4 = item4 != null ? await _productService.GetProductByIdAsync(item4.ProductId) : null;
             var detailDescription4 = product4 != null ? detailDescription1 : string.Empty;
-            var detailText4 = product4 != null ? _localizationService.GetLocalized(product4, entity => entity.Name) : string.Empty;
+            var detailText4 = product4 != null ? await _localizationService.GetLocalizedAsync(product4, entity => entity.Name) : string.Empty;
 
             var item5 = cart.Skip(4).FirstOrDefault();
-            var product5 = item5 != null ? _productService.GetProductById(item5.ProductId) : null;
+            var product5 = item5 != null ? await _productService.GetProductByIdAsync(item5.ProductId) : null;
             var detailDescription5 = product5 != null ? detailDescription1 : string.Empty;
-            var detailText5 = product5 != null ? _localizationService.GetLocalized(product5, entity => entity.Name) : string.Empty;
+            var detailText5 = product5 != null ? await _localizationService.GetLocalizedAsync(product5, entity => entity.Name) : string.Empty;
 
             var query = new Dictionary<string, string>
             {
                 ["pay_to_email"] = CommonHelper.EnsureMaximumLength(_settings.MerchantEmail, 50) ?? string.Empty,
-                ["recipient_description"] = CommonHelper.EnsureMaximumLength(_storeContext.CurrentStore.Name, 30) ?? string.Empty,
+                ["recipient_description"] = CommonHelper.EnsureMaximumLength(store.Name, 30) ?? string.Empty,
                 ["transaction_id"] = orderGuid.ToString(),
                 ["status_url"] = CommonHelper.EnsureMaximumLength(webhookUrl, 400) ?? string.Empty,
                 //["status_url2"] = string.Empty, //single webhook handler is enough
                 ["language"] = CommonHelper.EnsureMaximumLength(customerLanguage?.UniqueSeoCode ?? "EN", 2) ?? string.Empty,
                 //["logo_url"] = null, //not used, only store name will be shown
                 ["prepare_only"] = "1", //first, prepare the order details
-                ["dynamic_descriptor"] = CommonHelper.EnsureMaximumLength(_storeContext.CurrentStore.Name, 25) ?? string.Empty,
+                ["dynamic_descriptor"] = CommonHelper.EnsureMaximumLength(store.Name, 25) ?? string.Empty,
                 //["sid"] = null, //used in the next request
                 //["rid"] = CommonHelper.EnsureMaximumLength(Defaults.ReferralId, 100) ?? string.Empty, //according to Skrill managers "referral ID" should be passed in additional merchant fields, well ok
                 //["ext_ref_id"] = CommonHelper.EnsureMaximumLength(Defaults.UserAgent, 100) ?? string.Empty, //according to Skrill managers "referral ID" should be passed in additional merchant fields, well ok
                 ["merchant_fields"] = CommonHelper.EnsureMaximumLength("platform,platform_version,nop_customer_id", 240),
                 ["platform"] = CommonHelper.EnsureMaximumLength(Defaults.ReferralId, 240),
-                ["platform_version"] = CommonHelper.EnsureMaximumLength(NopVersion.CurrentVersion, 240),
+                ["platform_version"] = CommonHelper.EnsureMaximumLength(NopVersion.CURRENT_VERSION, 240),
                 ["return_url_target"] = "3", // opens the target URL in the same frame as the payment form.
                 ["return_url"] = CommonHelper.EnsureMaximumLength(successUrl, 240) ?? string.Empty,
 
@@ -429,8 +441,11 @@ namespace Nop.Plugin.Payments.Skrill.Services
         /// </summary>
         /// <param name="refundedOrder">Order to refund</param>
         /// <param name="refundedAmount">Amount to refund</param>
-        /// <returns>URL to request</returns>
-        private string PrepareRefundParameters(Order refundedOrder, decimal? refundedAmount)
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains URL to request
+        /// </returns>
+        private async Task<string> PrepareRefundParametersAsync(Order refundedOrder, decimal? refundedAmount)
         {
             if (refundedOrder == null)
                 throw new NopException("Order is not set");
@@ -440,11 +455,11 @@ namespace Nop.Plugin.Payments.Skrill.Services
 
             //prepare URLs
             var urlHelper = _urlHelperFactory.GetUrlHelper(_actionContextAccessor.ActionContext);
-            var webhookUrl = urlHelper.RouteUrl(Defaults.RefundWebhookRouteName, null, _webHelper.CurrentRequestProtocol);
+            var webhookUrl = urlHelper.RouteUrl(Defaults.RefundWebhookRouteName, null, _webHelper.GetCurrentRequestProtocol());
 
             //prepare unique refund identifier to avoid duplicated refunding
             var refundGuid = Guid.NewGuid().ToString().ToLowerInvariant();
-            _genericAttributeService.SaveAttribute(refundedOrder, Defaults.RefundGuidAttribute, refundGuid);
+            await _genericAttributeService.SaveAttributeAsync(refundedOrder, Defaults.RefundGuidAttribute, refundGuid);
 
             //prepare URL to request
             var url = QueryHelpers.AddQueryString(Defaults.RefundServiceUrl, new Dictionary<string, string>
@@ -470,10 +485,10 @@ namespace Nop.Plugin.Payments.Skrill.Services
         /// </summary>
         /// <param name="sessionRequestUrl">URL to request session details</param>
         /// <returns>URL</returns>
-        private string PrepareCheckoutUrl(string sessionRequestUrl)
+        private async Task<string> PrepareCheckoutUrlAsync(string sessionRequestUrl)
         {
             //first prepare checkout and get session id
-            var sessionResponse = _httpClient.GetAsync(sessionRequestUrl).Result;
+            var sessionResponse = await _httpClient.GetAsync(sessionRequestUrl);
             var sessionError = new { code = string.Empty, message = string.Empty };
             try
             {
@@ -508,38 +523,51 @@ namespace Nop.Plugin.Payments.Skrill.Services
         /// Prepare checkout URL to redirect customer
         /// </summary>
         /// <param name="orderGuid">Order guid</param>
-        /// <returns>URL</returns>
-        public string PrepareCheckoutUrl(Guid orderGuid)
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains URL
+        /// </returns>
+        public async Task<string> PrepareCheckoutUrlAsync(Guid orderGuid)
         {
-            return HandleFunction(() =>
+            var (result, _) = await HandleFunctionAsync(async () =>
             {
-                var sessionRequestUrl = PrepareSessionRequestUrl(orderGuid);
-                return PrepareCheckoutUrl(sessionRequestUrl);
-            }).Result;
+                var sessionRequestUrl = await PrepareSessionRequestUrlAsync(orderGuid);
+                return await PrepareCheckoutUrlAsync(sessionRequestUrl);
+            });
+
+            return await result;
         }
 
         /// <summary>
         /// Prepare checkout URL to redirect customer
         /// </summary>
         /// <param name="request">Payment info required for an order processing</param>
-        /// <returns>URL</returns>
-        public string PrepareCheckoutUrl(PostProcessPaymentRequest request)
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains URL
+        /// </returns>
+        public async Task<string> PrepareCheckoutUrlAsync(PostProcessPaymentRequest request)
         {
-            return HandleFunction(() =>
+            var (result, _) = await HandleFunctionAsync(async () =>
             {
-                var sessionRequestUrl = PrepareSessionRequestUrl(request);
-                return PrepareCheckoutUrl(sessionRequestUrl);
-            }).Result;
+                var sessionRequestUrl = await PrepareSessionRequestUrlAsync(request);
+                return await PrepareCheckoutUrlAsync(sessionRequestUrl);
+            });
+
+            return await result;
         }
 
         /// <summary>
         /// Gets the transaction currency code by transaction id
         /// </summary>
         /// <param name="transactionId">The transaction id</param>
-        /// <returns>The currency code; otherwise error</returns>
-        public (string CurrencyCode, string Error) GetTransactionCurrencyCode(string transactionId)
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains currency code; otherwise error
+        /// </returns>
+        public async Task<(string CurrencyCode, string Error)> GetTransactionCurrencyCodeAsync(string transactionId)
         {
-            return HandleFunction(() =>
+            var (result, error) = await HandleFunctionAsync(async () =>
             {
                 if (string.IsNullOrEmpty(transactionId))
                     throw new NopException("Transaction ID not set");
@@ -552,7 +580,7 @@ namespace Nop.Plugin.Payments.Skrill.Services
                     ["action"] = "status_trn",
                     ["mb_trn_id"] = transactionId,
                 });
-                var response = _httpClient.GetAsync(url).Result;
+                var response = await _httpClient.GetAsync(url);
                 if (response != null)
                 {
                     var match = Regex.Match(response, @"mb_currency=(\w*)");
@@ -562,6 +590,8 @@ namespace Nop.Plugin.Payments.Skrill.Services
 
                 throw new NopException($"Cannot get the currency code of the transaction");
             });
+
+            return (await result, error);
         }
 
         /// <summary>
@@ -569,14 +599,17 @@ namespace Nop.Plugin.Payments.Skrill.Services
         /// </summary>
         /// <param name="refundedOrder">Order to refund</param>
         /// <param name="refundedAmount">Amount to refund</param>
-        /// <returns>Whether refund is completed; Error if exists</returns>
-        public (bool Completed, string Error) Refund(Order refundedOrder, decimal? refundedAmount)
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains whether refund is completed; Error if exists
+        /// </returns>
+        public async Task<(bool Completed, string Error)> RefundAsync(Order refundedOrder, decimal? refundedAmount)
         {
-            return HandleFunction(() =>
+            var (result, error) = await HandleFunctionAsync(async () =>
             {
                 //first prepare refund
-                var url = PrepareRefundParameters(refundedOrder, refundedAmount);
-                var prepareResponse = _httpClient.GetAsync(url).Result;
+                var url = await PrepareRefundParametersAsync(refundedOrder, refundedAmount);
+                var prepareResponse = await _httpClient.GetAsync(url);
 
                 //try to get session id
                 var prepareXml = XDocument.Parse(prepareResponse);
@@ -588,11 +621,11 @@ namespace Nop.Plugin.Payments.Skrill.Services
                 }
 
                 //and now request service to refund
-                var refundResponse = _httpClient.GetAsync(QueryHelpers.AddQueryString(Defaults.RefundServiceUrl, new Dictionary<string, string>
+                var refundResponse = await _httpClient.GetAsync(QueryHelpers.AddQueryString(Defaults.RefundServiceUrl, new Dictionary<string, string>
                 {
                     ["action"] = "refund",
                     ["sid"] = sessionId,
-                })).Result;
+                }));
 
                 //check refund status
                 var refundXml = XDocument.Parse(refundResponse);
@@ -612,24 +645,26 @@ namespace Nop.Plugin.Payments.Skrill.Services
                 //refund pending
                 return false;
             });
+
+            return (await result, error);
         }
 
         /// <summary>
         /// Check whether specified credentials are valid
         /// </summary>
         /// <returns>Result</returns>
-        public bool ValidateCredentials()
+        public async Task<bool> ValidateCredentialsAsync()
         {
-            var (result, error) = HandleFunction(() =>
+            var (result, _) = await HandleFunctionAsync(async () =>
             {
                 //use a random get request only to check credentials validity
-                var response = _httpClient.GetAsync(QueryHelpers.AddQueryString(Defaults.MqiServiceUrl, new Dictionary<string, string>
+                var response = await _httpClient.GetAsync(QueryHelpers.AddQueryString(Defaults.MqiServiceUrl, new Dictionary<string, string>
                 {
                     ["email"] = _settings.MerchantEmail,
                     ["password"] = ToMD5(_settings.Password).ToLowerInvariant(),
                     ["action"] = "history",
                     ["start_date"] = DateTime.UtcNow.AddDays(-1).ToString("dd-MM-yyyy")
-                })).Result;
+                }));
 
                 //whether the response contains bad request status codes (400, 401, etc)
                 if (response.StartsWith("4"))
@@ -649,7 +684,7 @@ namespace Nop.Plugin.Payments.Skrill.Services
                 return true;
             });
 
-            return result;
+            return await result;
         }
 
         /// <summary>
@@ -657,9 +692,9 @@ namespace Nop.Plugin.Payments.Skrill.Services
         /// </summary>
         /// <param name="form">Request form parameters</param>
         /// <returns>Result</returns>
-        public bool ValidateWebhookRequest(IFormCollection form)
+        public async Task<bool> ValidateWebhookRequestAsync(IFormCollection form)
         {
-            var (result, error) = HandleFunction(() =>
+            var (result, error) = await HandleFunctionAsync(() =>
             {
                 if (!form?.Any() ?? true)
                     throw new NopException("Webhook request is empty");

@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
 using Nop.Services.Payments;
 using Nop.Web.Areas.Admin.Models.Orders;
 using Nop.Web.Framework.Components;
@@ -34,17 +35,20 @@ namespace Nop.Plugin.Payments.Skrill.Components
         /// </summary>
         /// <param name="widgetZone">Widget zone name</param>
         /// <param name="additionalData">Additional data</param>
-        /// <returns>View component result</returns>
-        public IViewComponentResult Invoke(string widgetZone, object additionalData)
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains the view component result
+        /// </returns>
+        public async Task<IViewComponentResult> InvokeAsync(string widgetZone, object additionalData)
         {
-            if (!_paymentPluginManager.IsPluginActive(Defaults.SystemName))
+            if (!await _paymentPluginManager.IsPluginActiveAsync(Defaults.SystemName))
                 return Content(string.Empty);
 
-            if (!widgetZone.Equals(AdminWidgetZones.OrderDetailsBlock) || !(additionalData is OrderModel model))
+            if (!widgetZone.Equals(AdminWidgetZones.OrderDetailsBlock) || additionalData is not OrderModel model)
                 return Content(string.Empty);
 
             if (!model.PaymentMethod.Equals(Defaults.SystemName) &&
-                !model.PaymentMethod.Equals(_paymentPluginManager.LoadPluginBySystemName(Defaults.SystemName)?.PluginDescriptor.FriendlyName))
+                !model.PaymentMethod.Equals((await _paymentPluginManager.LoadPluginBySystemNameAsync(Defaults.SystemName))?.PluginDescriptor.FriendlyName))
             {
                 return Content(string.Empty);
             }

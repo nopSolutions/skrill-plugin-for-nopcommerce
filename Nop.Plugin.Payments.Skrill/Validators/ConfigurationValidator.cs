@@ -16,11 +16,11 @@ namespace Nop.Plugin.Payments.Skrill.Validators
         {
             RuleFor(model => model.MerchantEmail)
                 .NotEmpty()
-                .WithMessage(localizationService.GetResource("Plugins.Payments.Skrill.Fields.MerchantEmail.Required"));
+                .WithMessageAwait(localizationService.GetResourceAsync("Plugins.Payments.Skrill.Fields.MerchantEmail.Required"));
 
             RuleFor(model => model.SecretWord)
                 .NotEmpty()
-                .WithMessage(localizationService.GetResource("Plugins.Payments.Skrill.Fields.SecretWord.Required"));
+                .WithMessageAwait(localizationService.GetResourceAsync("Plugins.Payments.Skrill.Fields.SecretWord.Required"));
         }
 
         #endregion

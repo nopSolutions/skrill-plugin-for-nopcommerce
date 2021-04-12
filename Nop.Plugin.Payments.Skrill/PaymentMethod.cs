@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
@@ -87,22 +88,26 @@ namespace Nop.Plugin.Payments.Skrill
         /// Process a payment
         /// </summary>
         /// <param name="processPaymentRequest">Payment info required for an order processing</param>
-        /// <returns>Process payment result</returns>
-        public ProcessPaymentResult ProcessPayment(ProcessPaymentRequest processPaymentRequest)
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains the process payment result
+        /// </returns>
+        public Task<ProcessPaymentResult> ProcessPaymentAsync(ProcessPaymentRequest processPaymentRequest)
         {
-            return new ProcessPaymentResult();
+            return Task.FromResult(new ProcessPaymentResult());
         }
 
         /// <summary>
         /// Post process payment (used by payment gateways that require redirecting to a third-party URL)
         /// </summary>
         /// <param name="postProcessPaymentRequest">Payment info required for an order processing</param>
-        public void PostProcessPayment(PostProcessPaymentRequest postProcessPaymentRequest)
+        /// <returns>A task that represents the asynchronous operation</returns>
+        public async Task PostProcessPaymentAsync(PostProcessPaymentRequest postProcessPaymentRequest)
         {
             switch (_serviceManager.GetPaymentFlowType())
             {
                 case PaymentFlowType.Redirection:
-                    var redirectUrl = _serviceManager.PrepareCheckoutUrl(postProcessPaymentRequest);
+                    var redirectUrl = await _serviceManager.PrepareCheckoutUrlAsync(postProcessPaymentRequest);
                     if (string.IsNullOrEmpty(redirectUrl))
                     {
                         redirectUrl = _urlHelperFactory.GetUrlHelper(_actionContextAccessor.ActionContext)
@@ -113,18 +118,18 @@ namespace Nop.Plugin.Payments.Skrill
                     return;
 
                 case PaymentFlowType.Inline:
-                    var customer = _customerService.GetCustomerById(postProcessPaymentRequest.Order.CustomerId);
+                    var customer = await _customerService.GetCustomerByIdAsync(postProcessPaymentRequest.Order.CustomerId);
                     if (customer != null)
                     {
                         var order = postProcessPaymentRequest.Order;
-                        var transactionId = _genericAttributeService.GetAttribute<string>(customer, Defaults.PaymentTransactionIdAttribute);
+                        var transactionId = await _genericAttributeService.GetAttributeAsync<string>(customer, Defaults.PaymentTransactionIdAttribute);
                         if (!string.IsNullOrEmpty(transactionId) && _orderProcessingService.CanMarkOrderAsPaid(order))
                         {
                             order.CaptureTransactionId = transactionId;
-                            _orderService.UpdateOrder(order);
-                            _orderProcessingService.MarkOrderAsPaid(order);
+                            await _orderService.UpdateOrderAsync(order);
+                            await _orderProcessingService.MarkOrderAsPaidAsync(order);
 
-                            _genericAttributeService.SaveAttribute<string>(customer, Defaults.PaymentTransactionIdAttribute, null);
+                            await _genericAttributeService.SaveAttributeAsync<string>(customer, Defaults.PaymentTransactionIdAttribute, null);
                         }
                     }
                     return;
@@ -135,10 +140,12 @@ namespace Nop.Plugin.Payments.Skrill
         /// Captures payment
         /// </summary>
         /// <param name="capturePaymentRequest">Capture payment request</param>
-        /// <returns>Capture payment result</returns>
-        public CapturePaymentResult Capture(CapturePaymentRequest capturePaymentRequest)
+        /// A task that represents the asynchronous operation
+        /// The task result contains the capture payment result
+        /// </returns>
+        public Task<CapturePaymentResult> CaptureAsync(CapturePaymentRequest capturePaymentRequest)
         {
-            return new CapturePaymentResult { Errors = new[] { "Capture method not supported" } };
+            return Task.FromResult(new CapturePaymentResult { Errors = new[] { "Capture method not supported" } });
         }
 
         /// <summary>
@@ -146,7 +153,7 @@ namespace Nop.Plugin.Payments.Skrill
         /// </summary>
         /// <param name="refundPaymentRequest">Request</param>
         /// <returns>Result</returns>
-        public RefundPaymentResult Refund(RefundPaymentRequest refundPaymentRequest)
+        public async Task<RefundPaymentResult> RefundAsync(RefundPaymentRequest refundPaymentRequest)
         {
             // null to refund full amount
             decimal? amountToRefund = null;
@@ -157,16 +164,16 @@ namespace Nop.Plugin.Payments.Skrill
 
                 //try convert to Skrill account currency
                 var capturedTransactionId = refundPaymentRequest.Order.CaptureTransactionId;
-                var (currencyCode, currencyCodeError) = _serviceManager.GetTransactionCurrencyCode(capturedTransactionId);
+                var (currencyCode, currencyCodeError) = await _serviceManager.GetTransactionCurrencyCodeAsync(capturedTransactionId);
                 if (!string.IsNullOrEmpty(currencyCodeError))
                     return new RefundPaymentResult { Errors = new[] { currencyCodeError } };
 
-                var primaryCurrency = _currencyService.GetCurrencyById(_currencySettings.PrimaryStoreCurrencyId);
+                var primaryCurrency = await _currencyService.GetCurrencyByIdAsync(_currencySettings.PrimaryStoreCurrencyId);
                 if (!primaryCurrency.CurrencyCode.Equals(currencyCode, StringComparison.InvariantCultureIgnoreCase))
                 {
-                    var skrillCurrency = _currencyService.GetCurrencyByCode(currencyCode);
+                    var skrillCurrency = await _currencyService.GetCurrencyByCodeAsync(currencyCode);
                     if (skrillCurrency != null)
-                        amountToRefund = _currencyService.ConvertCurrency(amountToRefund.Value, primaryCurrency, skrillCurrency);
+                        amountToRefund = await _currencyService.ConvertCurrencyAsync(amountToRefund.Value, primaryCurrency, skrillCurrency);
                     else
                     {
                         var currencyError = $"Cannot convert the refund amount to Skrill currency {currencyCode}. Currency ({currencyCode}) not install.";
@@ -175,7 +182,7 @@ namespace Nop.Plugin.Payments.Skrill
                 }
             }
 
-            var (completed, error) = _serviceManager.Refund(refundPaymentRequest.Order, amountToRefund);
+            var (completed, error) = await _serviceManager.RefundAsync(refundPaymentRequest.Order, amountToRefund);
 
             if (!string.IsNullOrEmpty(error))
                 return new RefundPaymentResult { Errors = new[] { error } };
@@ -191,7 +198,7 @@ namespace Nop.Plugin.Payments.Skrill
 
             //the refund is pending, actually it'll be completed upon receiving successful refund status report
             if (!completed)
-                result.AddError(_localizationService.GetResource("Plugins.Payments.Skrill.Refund.Warning"));
+                result.AddError(await _localizationService.GetResourceAsync("Plugins.Payments.Skrill.Refund.Warning"));
 
             return result;
         }
@@ -201,86 +208,107 @@ namespace Nop.Plugin.Payments.Skrill
         /// </summary>
         /// <param name="voidPaymentRequest">Request</param>
         /// <returns>Result</returns>
-        public VoidPaymentResult Void(VoidPaymentRequest voidPaymentRequest)
+        public Task<VoidPaymentResult> VoidAsync(VoidPaymentRequest voidPaymentRequest)
         {
-            return new VoidPaymentResult { Errors = new[] { "Void method not supported" } };
+            return Task.FromResult(new VoidPaymentResult { Errors = new[] { "Void method not supported" } });
         }
 
         /// <summary>
         /// Process recurring payment
         /// </summary>
         /// <param name="processPaymentRequest">Payment info required for an order processing</param>
-        /// <returns>Process payment result</returns>
-        public ProcessPaymentResult ProcessRecurringPayment(ProcessPaymentRequest processPaymentRequest)
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains the process payment result
+        /// </returns>
+        public Task<ProcessPaymentResult> ProcessRecurringPaymentAsync(ProcessPaymentRequest processPaymentRequest)
         {
-            return new ProcessPaymentResult { Errors = new[] { "Recurring payment not supported" } };
+            return Task.FromResult(new ProcessPaymentResult { Errors = new[] { "Recurring payment not supported" } });
         }
 
         /// <summary>
         /// Cancels a recurring payment
         /// </summary>
         /// <param name="cancelPaymentRequest">Request</param>
-        /// <returns>Result</returns>
-        public CancelRecurringPaymentResult CancelRecurringPayment(CancelRecurringPaymentRequest cancelPaymentRequest)
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains the result
+        /// </returns>
+        public Task<CancelRecurringPaymentResult> CancelRecurringPaymentAsync(CancelRecurringPaymentRequest cancelPaymentRequest)
         {
-            return new CancelRecurringPaymentResult { Errors = new[] { "Recurring payment not supported" } };
+            return Task.FromResult(new CancelRecurringPaymentResult { Errors = new[] { "Recurring payment not supported" } });
         }
 
         /// <summary>
         /// Returns a value indicating whether payment method should be hidden during checkout
         /// </summary>
         /// <param name="cart">Shoping cart</param>
-        /// <returns>true - hide; false - display.</returns>
-        public bool HidePaymentMethod(IList<ShoppingCartItem> cart)
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains the rue - hide; false - display.
+        /// </returns>
+        public Task<bool> HidePaymentMethodAsync(IList<ShoppingCartItem> cart)
         {
-            return false;
+            return Task.FromResult(false);
         }
 
         /// <summary>
         /// Gets additional handling fee
         /// </summary>
         /// <param name="cart">Shoping cart</param>
-        /// <returns>Additional handling fee</returns>
-        public decimal GetAdditionalHandlingFee(IList<ShoppingCartItem> cart)
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains the additional handling fee
+        /// </returns>
+        public Task<decimal> GetAdditionalHandlingFeeAsync(IList<ShoppingCartItem> cart)
         {
-            return decimal.Zero;
+            return Task.FromResult(decimal.Zero);
         }
 
         /// <summary>
         /// Gets a value indicating whether customers can complete a payment after order is placed but not completed (for redirection payment methods)
         /// </summary>
         /// <param name="order">Order</param>
-        /// <returns>Result</returns>
-        public bool CanRePostProcessPayment(Order order)
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains the result
+        /// </returns>
+        public Task<bool> CanRePostProcessPaymentAsync(Order order)
         {
-            return _serviceManager.GetPaymentFlowType() == PaymentFlowType.Redirection;
+            return Task.FromResult(_serviceManager.GetPaymentFlowType() == PaymentFlowType.Redirection);
         }
 
         /// <summary>
         /// Validate payment form
         /// </summary>
         /// <param name="form">The parsed form values</param>
-        /// <returns>List of validating errors</returns>
-        public IList<string> ValidatePaymentForm(IFormCollection form)
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains the list of validating errors
+        /// </returns>
+        public Task<IList<string>> ValidatePaymentFormAsync(IFormCollection form)
         {
-            return new List<string>();
+            return Task.FromResult<IList<string>>(new List<string>());
         }
 
         /// <summary>
         /// Get payment information
         /// </summary>
         /// <param name="form">The parsed form values</param>
-        /// <returns>Payment info holder</returns>
-        public ProcessPaymentRequest GetPaymentInfo(IFormCollection form)
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains the payment info holder
+        /// </returns>
+        public Task<ProcessPaymentRequest> GetPaymentInfoAsync(IFormCollection form)
         {
             if (form == null)
                 throw new ArgumentNullException(nameof(form));
 
             if (_serviceManager.GetPaymentFlowType() == PaymentFlowType.Inline)
                 //already set
-                return _actionContextAccessor.ActionContext.HttpContext.Session.Get<ProcessPaymentRequest>(Defaults.PaymentRequestSessionKey);
+                return Task.FromResult(_actionContextAccessor.ActionContext.HttpContext.Session.Get<ProcessPaymentRequest>(Defaults.PaymentRequestSessionKey));
 
-            return new ProcessPaymentRequest();
+            return Task.FromResult(new ProcessPaymentRequest());
         }
 
         /// <summary>
@@ -305,10 +333,13 @@ namespace Nop.Plugin.Payments.Skrill
         /// <summary>
         /// Gets widget zones where this widget should be rendered
         /// </summary>
-        /// <returns>Widget zones</returns>
-        public IList<string> GetWidgetZones()
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains the widget zones
+        /// </returns>
+        public Task<IList<string>> GetWidgetZonesAsync()
         {
-            return new List<string> { AdminWidgetZones.OrderDetailsBlock };
+            return Task.FromResult<IList<string>>(new List<string> { AdminWidgetZones.OrderDetailsBlock });
         }
 
         /// <summary>
@@ -330,10 +361,11 @@ namespace Nop.Plugin.Payments.Skrill
         /// <summary>
         /// Install the plugin
         /// </summary>
-        public override void Install()
+        /// <returns>A task that represents the asynchronous operation</returns>
+        public override async Task InstallAsync()
         {
             //settings
-            _settingService.SaveSetting(new SkrillSettings
+            await _settingService.SaveSettingAsync(new SkrillSettings
             {
                 PaymentFlowType = PaymentFlowType.Inline,
                 RequestTimeout = 10
@@ -342,11 +374,11 @@ namespace Nop.Plugin.Payments.Skrill
             if (!_widgetSettings.ActiveWidgetSystemNames.Contains(Defaults.SystemName))
             {
                 _widgetSettings.ActiveWidgetSystemNames.Add(Defaults.SystemName);
-                _settingService.SaveSetting(_widgetSettings);
+                await _settingService.SaveSettingAsync(_widgetSettings);
             }
 
             //locales
-            _localizationService.AddPluginLocaleResource(new Dictionary<string, string>
+            await _localizationService.AddLocaleResourceAsync(new Dictionary<string, string>
             {
                 ["Enums.Nop.Plugin.Payments.Skrill.Domain.PaymentFlowType.Redirection"] = "On the Skrill side",
                 ["Enums.Nop.Plugin.Payments.Skrill.Domain.PaymentFlowType.Inline"] = "On the Merchant side",
@@ -369,27 +401,37 @@ namespace Nop.Plugin.Payments.Skrill
                 ["Plugins.Payments.Skrill.Payment.Invalid"] = "Payment transaction is invalid.",
             });
 
-            base.Install();
+            await base.InstallAsync();
         }
 
         /// <summary>
         /// Uninstall the plugin
         /// </summary>
-        public override void Uninstall()
+        /// <returns>A task that represents the asynchronous operation</returns>
+        public override async Task UninstallAsync()
         {
             //settings
             if (_widgetSettings.ActiveWidgetSystemNames.Contains(Defaults.SystemName))
             {
                 _widgetSettings.ActiveWidgetSystemNames.Remove(Defaults.SystemName);
-                _settingService.SaveSetting(_widgetSettings);
+                await _settingService.SaveSettingAsync(_widgetSettings);
             }
-            _settingService.DeleteSetting<SkrillSettings>();
+            await _settingService.DeleteSettingAsync<SkrillSettings>();
 
             //locales
-            _localizationService.DeletePluginLocaleResources("Plugins.Payments.Skrill");
-            _localizationService.DeletePluginLocaleResources("Enums.Nop.Plugin.Payments.Skrill");
+            await _localizationService.DeleteLocaleResourcesAsync("Plugins.Payments.Skrill");
+            await _localizationService.DeleteLocaleResourcesAsync("Enums.Nop.Plugin.Payments.Skrill");
 
-            base.Uninstall();
+            await base.UninstallAsync();
+        }
+
+        /// <summary>
+        /// Gets a payment method description that will be displayed on checkout pages in the public store
+        /// </summary>
+        /// <returns>A task that represents the asynchronous operation</returns>
+        public async Task<string> GetPaymentMethodDescriptionAsync()
+        {
+            return await _localizationService.GetResourceAsync("Plugins.Payments.Skrill.PaymentMethodDescription");
         }
 
         #endregion
@@ -435,11 +477,6 @@ namespace Nop.Plugin.Payments.Skrill
         /// Gets a value indicating whether we should display a payment information page for this plugin
         /// </summary>
         public bool SkipPaymentInfo => _serviceManager.GetPaymentFlowType() == PaymentFlowType.Redirection;
-
-        /// <summary>
-        /// Gets a payment method description that will be displayed on checkout pages in the public store
-        /// </summary>
-        public string PaymentMethodDescription => _localizationService.GetResource("Plugins.Payments.Skrill.PaymentMethodDescription");
 
         /// <summary>
         /// Gets a value indicating whether to hide this plugin on the widget list page in the admin area

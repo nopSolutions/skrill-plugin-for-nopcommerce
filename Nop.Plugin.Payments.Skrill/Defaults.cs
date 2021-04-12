@@ -15,7 +15,7 @@ namespace Nop.Plugin.Payments.Skrill
         /// <summary>
         /// Gets the user agent used to request third-party services
         /// </summary>
-        public static string UserAgent => $"nopCommerce-{NopVersion.CurrentVersion}";
+        public static string UserAgent => $"nopCommerce-{NopVersion.CURRENT_VERSION}";
 
         /// <summary>
         /// Gets the third-party service URL to request

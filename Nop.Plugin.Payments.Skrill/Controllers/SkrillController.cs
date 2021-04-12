@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
 using Nop.Core;
 using Nop.Core.Infrastructure;
 using Nop.Plugin.Payments.Skrill.Domain;
@@ -51,14 +52,14 @@ namespace Nop.Plugin.Payments.Skrill.Controllers
 
         #region Methods
 
-        public IActionResult Configure()
+        public async Task<IActionResult> Configure()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManagePaymentMethods))
+            if (!await _permissionService.AuthorizeAsync(StandardPermissionProvider.ManagePaymentMethods))
                 return AccessDeniedView();
 
             //load settings for a chosen store scope
-            var storeScope = _storeContext.ActiveStoreScopeConfiguration;
-            var settings = _settingService.LoadSetting<SkrillSettings>(storeScope);
+            var storeScope = await _storeContext.GetActiveStoreScopeConfigurationAsync();
+            var settings = await _settingService.LoadSettingAsync<SkrillSettings>(storeScope);
 
             //prepare model
             var model = new ConfigurationModel
@@ -68,61 +69,61 @@ namespace Nop.Plugin.Payments.Skrill.Controllers
                 Password = settings.Password,
                 ActiveStoreScopeConfiguration = storeScope,
                 PaymentFlowTypeId = (int)settings.PaymentFlowType,
-                PaymentFlowTypes = settings.PaymentFlowType.ToSelectList()
+                PaymentFlowTypes = await settings.PaymentFlowType.ToSelectListAsync()
             };
 
             if (storeScope > 0)
             {
-                model.MerchantEmail_OverrideForStore = _settingService.SettingExists(settings, setting => setting.MerchantEmail, storeScope);
-                model.SecretWord_OverrideForStore = _settingService.SettingExists(settings, setting => setting.SecretWord, storeScope);
-                model.Password_OverrideForStore = _settingService.SettingExists(settings, setting => setting.Password, storeScope);
-                model.PaymentFlowTypeId_OverrideForStore = _settingService.SettingExists(settings, setting => setting.PaymentFlowType, storeScope);
+                model.MerchantEmail_OverrideForStore = await _settingService.SettingExistsAsync(settings, setting => setting.MerchantEmail, storeScope);
+                model.SecretWord_OverrideForStore = await _settingService.SettingExistsAsync(settings, setting => setting.SecretWord, storeScope);
+                model.Password_OverrideForStore = await _settingService.SettingExistsAsync(settings, setting => setting.Password, storeScope);
+                model.PaymentFlowTypeId_OverrideForStore = await _settingService.SettingExistsAsync(settings, setting => setting.PaymentFlowType, storeScope);
             }
 
             return View("~/Plugins/Payments.Skrill/Views/Configure.cshtml", model);
         }
 
         [HttpPost]
-        public IActionResult Configure(ConfigurationModel model)
+        public async Task<IActionResult> Configure(ConfigurationModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManagePaymentMethods))
+            if (!await _permissionService.AuthorizeAsync(StandardPermissionProvider.ManagePaymentMethods))
                 return AccessDeniedView();
 
             if (!ModelState.IsValid)
-                return Configure();
+                return await Configure();
 
             //load settings for a chosen store scope
-            var storeScope = _storeContext.ActiveStoreScopeConfiguration;
-            var settings = _settingService.LoadSetting<SkrillSettings>(storeScope);
+            var storeScope = await _storeContext.GetActiveStoreScopeConfigurationAsync();
+            var settings = await _settingService.LoadSettingAsync<SkrillSettings>(storeScope);
 
             settings.MerchantEmail = model.MerchantEmail;
-            settings.SecretWord = model.SecretWord;
-            settings.Password = model.Password;
+            settings.SecretWord = model.SecretWord.Trim();
+            settings.Password = model.Password.Trim();
             settings.PaymentFlowType = (PaymentFlowType)model.PaymentFlowTypeId;
 
             //save settings
-            _settingService.SaveSettingOverridablePerStore(settings, setting => setting.MerchantEmail, model.MerchantEmail_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(settings, setting => setting.SecretWord, model.SecretWord_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(settings, setting => setting.Password, model.Password_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(settings, setting => setting.PaymentFlowType, model.PaymentFlowTypeId_OverrideForStore, storeScope, false);
-            _settingService.ClearCache();
+            await _settingService.SaveSettingOverridablePerStoreAsync(settings, setting => setting.MerchantEmail, model.MerchantEmail_OverrideForStore, storeScope, false);
+            await _settingService.SaveSettingOverridablePerStoreAsync(settings, setting => setting.SecretWord, model.SecretWord_OverrideForStore, storeScope, false);
+            await _settingService.SaveSettingOverridablePerStoreAsync(settings, setting => setting.Password, model.Password_OverrideForStore, storeScope, false);
+            await _settingService.SaveSettingOverridablePerStoreAsync(settings, setting => setting.PaymentFlowType, model.PaymentFlowTypeId_OverrideForStore, storeScope, false);
+            await _settingService.ClearCacheAsync();
 
-            _notificationService.SuccessNotification(_localizationService.GetResource("Admin.Plugins.Saved"));
+            _notificationService.SuccessNotification(await _localizationService.GetResourceAsync("Admin.Plugins.Saved"));
 
             //validate credentials
             if (!string.IsNullOrEmpty(settings.Password))
             {
                 var serviceManager = EngineContext.Current.Resolve<ServiceManager>();
-                if (serviceManager.ValidateCredentials())
-                    _notificationService.SuccessNotification(_localizationService.GetResource("Plugins.Payments.Skrill.Credentials.Valid"));
+                if (await serviceManager.ValidateCredentialsAsync())
+                    _notificationService.SuccessNotification(await _localizationService.GetResourceAsync("Plugins.Payments.Skrill.Credentials.Valid"));
                 else
                 {
-                    var error = string.Format(_localizationService.GetResource("Plugins.Payments.Skrill.Credentials.Invalid"), Url.Action("List", "Log"));
+                    var error = string.Format(await _localizationService.GetResourceAsync("Plugins.Payments.Skrill.Credentials.Invalid"), Url.Action("List", "Log"));
                     _notificationService.ErrorNotification(error, false);
                 }
             }
 
-            return Configure();
+            return await Configure();
         }
 
         #endregion

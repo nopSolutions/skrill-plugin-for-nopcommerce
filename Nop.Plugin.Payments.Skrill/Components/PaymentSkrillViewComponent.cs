@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
 using Nop.Core.Http.Extensions;
 using Nop.Plugin.Payments.Skrill.Services;
 using Nop.Services.Payments;
@@ -38,14 +39,14 @@ namespace Nop.Plugin.Payments.Skrill.Components
         /// <param name="widgetZone">Widget zone name</param>
         /// <param name="additionalData">Additional data</param>
         /// <returns>View component result</returns>
-        public IViewComponentResult Invoke(string widgetZone, object additionalData)
+        public async Task<IViewComponentResult> InvokeAsync(string widgetZone, object additionalData)
         {
             HttpContext.Session.Remove(Defaults.PaymentRequestSessionKey);
             var processPaymentRequest = new ProcessPaymentRequest();
             _paymentService.GenerateOrderGuid(processPaymentRequest);
             HttpContext.Session.Set(Defaults.PaymentRequestSessionKey, processPaymentRequest);
 
-            var paymentUrl = _serviceManager.PrepareCheckoutUrl(processPaymentRequest.OrderGuid);
+            var paymentUrl = await _serviceManager.PrepareCheckoutUrlAsync(processPaymentRequest.OrderGuid);
 
             return View("~/Plugins/Payments.Skrill/Views/PaymentInfo.cshtml", paymentUrl);
         }

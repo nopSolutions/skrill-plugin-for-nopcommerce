@@ -18,7 +18,7 @@
 
 <script asp-location="Footer">
     $(document).ready(function () {
-        $('input.payment-info-next-step-button').hide();
+        $('button.payment-info-next-step-button').hide();
         $('.skrill-payment-iframe').on('load', function () {
             var $body = $(this).contents().find('body');
             if ($body.length <= 0)
@@ -27,8 +27,8 @@
             var status = $body.text();
             if (status === 'Ok') {
                 $('.skrill-payment-container').html($('<span/>').text('@T("Plugins.Payments.Skrill.Payment.Successful")'))
-                $('input.payment-info-next-step-button').show();
-                $('input.payment-info-next-step-button').click();
+                $('button.payment-info-next-step-button').show();
+                $('button.payment-info-next-step-button').click();
             } else {
                 $('.skrill-payment-container').html($('<span/>').text('@T("Plugins.Payments.Skrill.Payment.Invalid")'))
             }
