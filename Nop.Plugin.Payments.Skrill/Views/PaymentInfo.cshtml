@@ -38,5 +38,5 @@
 
 @if (orderSettings.OnePageCheckoutEnabled)
 {
-    @Html.NopInlineScripts(ResourceLocation.Footer)
+    @NopHtml.GenerateInlineScripts(ResourceLocation.Footer);
 }

@@ -19,6 +19,8 @@ namespace Nop.Plugin.Payments.Skrill.Infrastructure
         /// <param name="configuration">Configuration of the application</param>
         public void ConfigureServices(IServiceCollection services, IConfiguration configuration)
         {
+            services.AddScoped<ServiceManager>();
+
             services.AddHttpClient<ServiceHttpClient>().WithProxy();
         }
 

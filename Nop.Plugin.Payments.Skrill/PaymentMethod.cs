@@ -378,7 +378,7 @@ namespace Nop.Plugin.Payments.Skrill
             }
 
             //locales
-            await _localizationService.AddLocaleResourceAsync(new Dictionary<string, string>
+            await _localizationService.AddOrUpdateLocaleResourceAsync(new Dictionary<string, string>
             {
                 ["Enums.Nop.Plugin.Payments.Skrill.Domain.PaymentFlowType.Redirection"] = "On the Skrill side",
                 ["Enums.Nop.Plugin.Payments.Skrill.Domain.PaymentFlowType.Inline"] = "On the Merchant side",
