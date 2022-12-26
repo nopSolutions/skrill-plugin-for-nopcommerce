@@ -13,7 +13,6 @@ using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.AspNetCore.WebUtilities;
 using Newtonsoft.Json;
 using Nop.Core;
-using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Directory;
 using Nop.Core.Domain.Orders;
 using Nop.Plugin.Payments.Skrill.Domain;
@@ -45,12 +44,12 @@ namespace Nop.Plugin.Payments.Skrill.Services
         private readonly ILanguageService _languageService;
         private readonly ILocalizationService _localizationService;
         private readonly ILogger _logger;
-        private readonly IProductService _productService;
         private readonly IOrderService _orderService;
         private readonly IOrderTotalCalculationService _orderTotalCalculationService;
+        private readonly IProductService _productService;
+        private readonly IShoppingCartService _shoppingCartService;
         private readonly IStateProvinceService _stateProvinceService;
         private readonly IStoreContext _storeContext;
-        private readonly IShoppingCartService _shoppingCartService;
         private readonly IUrlHelperFactory _urlHelperFactory;
         private readonly IWebHelper _webHelper;
         private readonly IWorkContext _workContext;
@@ -71,12 +70,12 @@ namespace Nop.Plugin.Payments.Skrill.Services
             ILanguageService languageService,
             ILocalizationService localizationService,
             ILogger logger,
-            IProductService productService,
             IOrderService orderService,
             IOrderTotalCalculationService orderTotalCalculationService,
+            IProductService productService,
+            IShoppingCartService shoppingCartService,
             IStateProvinceService stateProvinceService,
             IStoreContext storeContext,
-            IShoppingCartService shoppingCartService,
             IUrlHelperFactory urlHelperFactory,
             IWebHelper webHelper,
             IWorkContext workContext,
@@ -93,12 +92,12 @@ namespace Nop.Plugin.Payments.Skrill.Services
             _languageService = languageService;
             _localizationService = localizationService;
             _logger = logger;
-            _productService = productService;
             _orderService = orderService;
             _orderTotalCalculationService = orderTotalCalculationService;
+            _productService = productService;
+            _shoppingCartService = shoppingCartService;
             _stateProvinceService = stateProvinceService;
             _storeContext = storeContext;
-            _shoppingCartService = shoppingCartService;
             _urlHelperFactory = urlHelperFactory;
             _webHelper = webHelper;
             _workContext = workContext;
@@ -129,7 +128,7 @@ namespace Nop.Plugin.Payments.Skrill.Services
         /// A task that represents the asynchronous operation
         /// The task result contains the result; error message if exists
         /// </returns>
-        private async Task<(TResult Result, string ErrorMessage)> HandleFunctionAsync<TResult>(Func<TResult> function)
+        private async Task<(TResult Result, string ErrorMessage)> HandleFunctionAsync<TResult>(Func<Task<TResult>> function)
         {
             try
             {
@@ -138,7 +137,7 @@ namespace Nop.Plugin.Payments.Skrill.Services
                     throw new NopException("Plugin not configured");
 
                 //invoke function
-                return (function(), default);
+                return (await function(), default);
             }
             catch (Exception exception)
             {
@@ -161,7 +160,8 @@ namespace Nop.Plugin.Payments.Skrill.Services
                 return string.Empty;
 
             var hash = new StringBuilder();
-            new MD5CryptoServiceProvider().ComputeHash(Encoding.UTF8.GetBytes(value)).ToList().ForEach(bytes => hash.AppendFormat("{0:X2}", bytes));
+            using var provider = MD5.Create();
+            provider.ComputeHash(Encoding.UTF8.GetBytes(value)).ToList().ForEach(bytes => hash.AppendFormat("{0:X2}", bytes));
             return hash.ToString();
         }
 
@@ -207,8 +207,7 @@ namespace Nop.Plugin.Payments.Skrill.Services
 
             //prepare some customer details
             var customerLanguage = await _languageService.GetLanguageByIdAsync(order.CustomerLanguageId) ?? await _workContext.GetWorkingLanguageAsync();
-            var dateOfBirthValue = await _genericAttributeService.GetAttributeAsync<string>(customer, NopCustomerDefaults.DateOfBirthAttribute);
-            var customerDateOfBirth = DateTime.TryParse(dateOfBirthValue, out var dateOfBirth) ? dateOfBirth.ToString("ddMMyyyy") : string.Empty;
+            var customerDateOfBirth = customer.DateOfBirth?.ToString("ddMMyyyy") ?? string.Empty;
 
             //prepare some item details
             var orderItems = await _orderService.GetOrderItemsAsync(order.Id);
@@ -343,8 +342,7 @@ namespace Nop.Plugin.Payments.Skrill.Services
 
             //prepare some customer details
             var customerLanguage = await _workContext.GetWorkingLanguageAsync();
-            var dateOfBirthValue = await _genericAttributeService.GetAttributeAsync<string>(customer, NopCustomerDefaults.DateOfBirthAttribute);
-            var customerDateOfBirth = DateTime.TryParse(dateOfBirthValue, out var dateOfBirth) ? dateOfBirth.ToString("ddMMyyyy") : string.Empty;
+            var customerDateOfBirth = customer.DateOfBirth?.ToString("ddMMyyyy") ?? string.Empty;
 
             var store = await _storeContext.GetCurrentStoreAsync();
             var cart = await _shoppingCartService.GetShoppingCartAsync(customer, ShoppingCartType.ShoppingCart, store.Id);
@@ -535,7 +533,7 @@ namespace Nop.Plugin.Payments.Skrill.Services
                 return await PrepareCheckoutUrlAsync(sessionRequestUrl);
             });
 
-            return await result;
+            return result;
         }
 
         /// <summary>
@@ -554,7 +552,7 @@ namespace Nop.Plugin.Payments.Skrill.Services
                 return await PrepareCheckoutUrlAsync(sessionRequestUrl);
             });
 
-            return await result;
+            return result;
         }
 
         /// <summary>
@@ -567,7 +565,7 @@ namespace Nop.Plugin.Payments.Skrill.Services
         /// </returns>
         public async Task<(string CurrencyCode, string Error)> GetTransactionCurrencyCodeAsync(string transactionId)
         {
-            var (result, error) = await HandleFunctionAsync(async () =>
+            return await HandleFunctionAsync(async () =>
             {
                 if (string.IsNullOrEmpty(transactionId))
                     throw new NopException("Transaction ID not set");
@@ -590,8 +588,6 @@ namespace Nop.Plugin.Payments.Skrill.Services
 
                 throw new NopException($"Cannot get the currency code of the transaction");
             });
-
-            return (await result, error);
         }
 
         /// <summary>
@@ -605,7 +601,7 @@ namespace Nop.Plugin.Payments.Skrill.Services
         /// </returns>
         public async Task<(bool Completed, string Error)> RefundAsync(Order refundedOrder, decimal? refundedAmount)
         {
-            var (result, error) = await HandleFunctionAsync(async () =>
+            return await HandleFunctionAsync(async () =>
             {
                 //first prepare refund
                 var url = await PrepareRefundParametersAsync(refundedOrder, refundedAmount);
@@ -645,8 +641,6 @@ namespace Nop.Plugin.Payments.Skrill.Services
                 //refund pending
                 return false;
             });
-
-            return (await result, error);
         }
 
         /// <summary>
@@ -684,7 +678,7 @@ namespace Nop.Plugin.Payments.Skrill.Services
                 return true;
             });
 
-            return await result;
+            return result;
         }
 
         /// <summary>
@@ -694,7 +688,7 @@ namespace Nop.Plugin.Payments.Skrill.Services
         /// <returns>Result</returns>
         public async Task<bool> ValidateWebhookRequestAsync(IFormCollection form)
         {
-            var (result, error) = await HandleFunctionAsync(() =>
+            var (result, _) = await HandleFunctionAsync(() =>
             {
                 if (!form?.Any() ?? true)
                     throw new NopException("Webhook request is empty");
@@ -715,7 +709,7 @@ namespace Nop.Plugin.Payments.Skrill.Services
                 if (!signature.ToString().Equals(encryptedString, StringComparison.InvariantCultureIgnoreCase))
                     throw new NopException("Webhook request isn't valid");
 
-                return true;
+                return Task.FromResult(true);
             });
 
             return result;

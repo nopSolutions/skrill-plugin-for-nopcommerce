@@ -10,19 +10,18 @@ using Nop.Services.Common;
 using Nop.Services.Customers;
 using Nop.Services.Orders;
 using Nop.Services.Payments;
-using Nop.Web.Framework.Controllers;
 
 namespace Nop.Plugin.Payments.Skrill.Controllers
 {
-    public class SkrillWebhookController : BasePaymentController
+    public class SkrillWebhookController : Controller
     {
         #region Fields
 
         private readonly ICustomerService _customerService;
         private readonly IGenericAttributeService _genericAttributeService;
-        private readonly IPaymentService _paymentService;
         private readonly IOrderProcessingService _orderProcessingService;
         private readonly IOrderService _orderService;
+        private readonly IPaymentService _paymentService;
         private readonly ServiceManager _serviceManager;
 
         #endregion
@@ -31,16 +30,16 @@ namespace Nop.Plugin.Payments.Skrill.Controllers
 
         public SkrillWebhookController(ICustomerService customerService,
             IGenericAttributeService genericAttributeService,
-            IPaymentService paymentService,
             IOrderProcessingService orderProcessingService,
             IOrderService orderService,
+            IPaymentService paymentService,
             ServiceManager serviceManager)
         {
             _customerService = customerService;
             _genericAttributeService = genericAttributeService;
-            _paymentService = paymentService;
             _orderProcessingService = orderProcessingService;
             _orderService = orderService;
+            _paymentService = paymentService;
             _serviceManager = serviceManager;
         }
 

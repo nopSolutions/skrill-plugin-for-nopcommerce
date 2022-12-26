@@ -10,7 +10,6 @@ namespace Nop.Plugin.Payments.Skrill.Components
     /// <summary>
     /// Represents payment info view component
     /// </summary>
-    [ViewComponent(Name = Defaults.PAYMENT_INFO_VIEW_COMPONENT_NAME)]
     public class PaymentSkrillViewComponent : NopViewComponent
     {
         #region Fields
@@ -34,11 +33,14 @@ namespace Nop.Plugin.Payments.Skrill.Components
         #region Methods
 
         /// <summary>
-        /// Invokes view component
+        /// Invoke view component
         /// </summary>
         /// <param name="widgetZone">Widget zone name</param>
         /// <param name="additionalData">Additional data</param>
-        /// <returns>View component result</returns>
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains the view component result
+        /// </returns>
         public async Task<IViewComponentResult> InvokeAsync(string widgetZone, object additionalData)
         {
             HttpContext.Session.Remove(Defaults.PaymentRequestSessionKey);

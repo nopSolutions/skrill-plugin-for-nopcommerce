@@ -10,7 +10,6 @@ namespace Nop.Plugin.Payments.Skrill.Components
     /// <summary>
     /// Represents the view component to display refund hints
     /// </summary>
-    [ViewComponent(Name = Defaults.REFUND_HINTS_VIEW_COMPONENT_NAME)]
     public class RefundHintsViewComponent : NopViewComponent
     {
         #region Fields

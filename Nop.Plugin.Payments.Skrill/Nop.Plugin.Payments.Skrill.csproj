@@ -1,11 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net7.0</TargetFramework>
     <Copyright>Copyright © Nop Solutions, Ltd</Copyright>
     <Company>Nop Solutions, Ltd</Company>
     <Authors>Nop Solutions, Ltd</Authors>
-    <PackageLicenseUrl>https://github.com/nopSolutions/skrill-plugin-for-nopcommerce/blob/nopCommerce-4.40/LICENSE.md</PackageLicenseUrl>
+    <PackageLicenseUrl>https://github.com/nopSolutions/skrill-plugin-for-nopcommerce/blob/nopCommerce-4.60/LICENSE.md</PackageLicenseUrl>
     <PackageProjectUrl>https://www.nopcommerce.com/skrill-payment-module</PackageProjectUrl>
     <RepositoryUrl>https://github.com/nopSolutions/skrill-plugin-for-nopcommerce</RepositoryUrl>
     <RepositoryType>Git</RepositoryType>
@@ -20,8 +20,8 @@
     <None Remove="plugin.json" />
     <None Remove="Views\PaymentInfo.cshtml" />
     <None Remove="Views\RefundHints.cshtml" />
-    <None Remove="Views\_ViewImports.cshtml" />
     <None Remove="Views\Configure.cshtml" />
+    <None Remove="Views\_ViewImports.cshtml" />
   </ItemGroup>
 
   <ItemGroup>

@@ -8,7 +8,7 @@ namespace Nop.Plugin.Payments.Skrill.Services
     /// <summary>
     /// Represents the HTTP client to request third-party services
     /// </summary>
-    public partial class ServiceHttpClient
+    public class ServiceHttpClient
     {
         #region Fields
 

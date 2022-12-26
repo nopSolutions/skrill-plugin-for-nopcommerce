@@ -50,7 +50,7 @@
                         <nop-label asp-for="SecretWord" />
                     </div>
                     <div class="col-md-9">
-                        <nop-editor asp-for="SecretWord" asp-required="true" asp-value="@Model.SecretWord" />
+                        <nop-editor asp-for="SecretWord" asp-required="true" html-attributes="@(new { value = Model.SecretWord })" />
                         <span asp-validation-for="SecretWord"></span>
                     </div>
                 </div>
@@ -60,7 +60,7 @@
                         <nop-label asp-for="Password" />
                     </div>
                     <div class="col-md-9">
-                        <nop-editor asp-for="Password" asp-value="@Model.Password" />
+                        <nop-editor asp-for="Password" html-attributes="@(new { value = Model.Password })" />
                         <span asp-validation-for="Password"></span>
                     </div>
                 </div>

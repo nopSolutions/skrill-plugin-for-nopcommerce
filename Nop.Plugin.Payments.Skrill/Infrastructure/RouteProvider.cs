@@ -16,17 +16,21 @@ namespace Nop.Plugin.Payments.Skrill.Infrastructure
         /// <param name="endpointRouteBuilder">Route builder</param>
         public void RegisterRoutes(IEndpointRouteBuilder endpointRouteBuilder)
         {
-            endpointRouteBuilder.MapControllerRoute(Defaults.ConfigurationRouteName, "Plugins/Skrill/Configure",
-                new { controller = "Skrill", action = "Configure", area = AreaNames.Admin });
+            endpointRouteBuilder.MapControllerRoute(name: Defaults.ConfigurationRouteName,
+                pattern: "Plugins/Skrill/Configure",
+                defaults: new { controller = "Skrill", action = "Configure", area = AreaNames.Admin });
 
-            endpointRouteBuilder.MapControllerRoute(Defaults.OrderPaidWebhookRouteName, "Plugins/Skrill/OrderPaidWebhook",
-                new { controller = "SkrillWebhook", action = "OrderPaidWebhook" });
+            endpointRouteBuilder.MapControllerRoute(name: Defaults.OrderPaidWebhookRouteName,
+                pattern: "Plugins/Skrill/OrderPaidWebhook",
+                defaults: new { controller = "SkrillWebhook", action = "OrderPaidWebhook" });
 
-            endpointRouteBuilder.MapControllerRoute(Defaults.QuickCheckoutWebhookRouteName, "Plugins/Skrill/QuickCheckoutWebhook",
-                new { controller = "SkrillWebhook", action = "QuickCheckoutWebhook" });
+            endpointRouteBuilder.MapControllerRoute(name: Defaults.QuickCheckoutWebhookRouteName,
+                pattern: "Plugins/Skrill/QuickCheckoutWebhook",
+                defaults: new { controller = "SkrillWebhook", action = "QuickCheckoutWebhook" });
 
-            endpointRouteBuilder.MapControllerRoute(Defaults.RefundWebhookRouteName, "Plugins/Skrill/RefundWebhook",
-                new { controller = "SkrillWebhook", action = "RefundWebhook" });
+            endpointRouteBuilder.MapControllerRoute(name: Defaults.RefundWebhookRouteName,
+                pattern: "Plugins/Skrill/RefundWebhook",
+                defaults: new { controller = "SkrillWebhook", action = "RefundWebhook" });
         }
 
         /// <summary>

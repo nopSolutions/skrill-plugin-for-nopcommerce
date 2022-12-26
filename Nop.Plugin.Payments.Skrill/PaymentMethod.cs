@@ -10,6 +10,7 @@ using Nop.Core.Domain.Directory;
 using Nop.Core.Domain.Orders;
 using Nop.Core.Domain.Payments;
 using Nop.Core.Http.Extensions;
+using Nop.Plugin.Payments.Skrill.Components;
 using Nop.Plugin.Payments.Skrill.Domain;
 using Nop.Plugin.Payments.Skrill.Services;
 using Nop.Services.Cms;
@@ -33,17 +34,17 @@ namespace Nop.Plugin.Payments.Skrill
     {
         #region Fields
 
+        private readonly CurrencySettings _currencySettings;
         private readonly IActionContextAccessor _actionContextAccessor;
-        private readonly ICustomerService _customerService;
         private readonly ICurrencyService _currencyService;
+        private readonly ICustomerService _customerService;
+        private readonly IGenericAttributeService _genericAttributeService;
         private readonly ILocalizationService _localizationService;
         private readonly INotificationService _notificationService;
-        private readonly ISettingService _settingService;
         private readonly IOrderProcessingService _orderProcessingService;
         private readonly IOrderService _orderService;
-        private readonly IGenericAttributeService _genericAttributeService;
+        private readonly ISettingService _settingService;
         private readonly IUrlHelperFactory _urlHelperFactory;
-        private readonly CurrencySettings _currencySettings;
         private readonly ServiceManager _serviceManager;
         private readonly WidgetSettings _widgetSettings;
 
@@ -51,31 +52,31 @@ namespace Nop.Plugin.Payments.Skrill
 
         #region Ctor
 
-        public PaymentMethod(IActionContextAccessor actionContextAccessor,
-            ICustomerService customerService,
+        public PaymentMethod(CurrencySettings currencySettings,
+            IActionContextAccessor actionContextAccessor,
             ICurrencyService currencyService,
+            ICustomerService customerService,
+            IGenericAttributeService genericAttributeService,
             ILocalizationService localizationService,
             INotificationService notificationService,
-            ISettingService settingService,
             IOrderProcessingService orderProcessingService,
             IOrderService orderService,
-            IGenericAttributeService genericAttributeService,
+            ISettingService settingService,
             IUrlHelperFactory urlHelperFactory,
-            CurrencySettings currencySettings,
             ServiceManager serviceManager,
             WidgetSettings widgetSettings)
         {
+            _currencySettings = currencySettings;
             _actionContextAccessor = actionContextAccessor;
-            _customerService = customerService;
             _currencyService = currencyService;
+            _customerService = customerService;
+            _genericAttributeService = genericAttributeService;
             _localizationService = localizationService;
             _notificationService = notificationService;
-            _settingService = settingService;
             _orderProcessingService = orderProcessingService;
             _orderService = orderService;
-            _genericAttributeService = genericAttributeService;
+            _settingService = settingService;
             _urlHelperFactory = urlHelperFactory;
-            _currencySettings = currencySettings;
             _serviceManager = serviceManager;
             _widgetSettings = widgetSettings;
         }
@@ -320,13 +321,13 @@ namespace Nop.Plugin.Payments.Skrill
         }
 
         /// <summary>
-        /// Gets a view component for displaying plugin in public store ("payment info" checkout step)
+        /// Gets a type of a view component for displaying plugin in public store ("payment info" checkout step)
         /// </summary>
-        /// <param name="viewComponentName">View component name</param>
-        public string GetPublicViewComponentName()
+        /// <returns>View component type</returns>
+        public Type GetPublicViewComponent()
         {
             return _serviceManager.GetPaymentFlowType() == PaymentFlowType.Inline
-                ? Defaults.PAYMENT_INFO_VIEW_COMPONENT_NAME
+                ? typeof(PaymentSkrillViewComponent)
                 : null;
         }
 
@@ -343,19 +344,19 @@ namespace Nop.Plugin.Payments.Skrill
         }
 
         /// <summary>
-        /// Gets a name of a view component for displaying widget
+        /// Gets a type of a view component for displaying widget
         /// </summary>
         /// <param name="widgetZone">Name of the widget zone</param>
-        /// <returns>View component name</returns>
-        public string GetWidgetViewComponentName(string widgetZone)
+        /// <returns>View component type</returns>
+        public Type GetWidgetViewComponent(string widgetZone)
         {
-            if (widgetZone == null)
+            if (widgetZone is null)
                 throw new ArgumentNullException(nameof(widgetZone));
 
             if (widgetZone.Equals(AdminWidgetZones.OrderDetailsBlock))
-                return Defaults.REFUND_HINTS_VIEW_COMPONENT_NAME;
+                return typeof(RefundHintsViewComponent);
 
-            return string.Empty;
+            return null;
         }
 
         /// <summary>
@@ -466,7 +467,7 @@ namespace Nop.Plugin.Payments.Skrill
         /// <summary>
         /// Gets a payment method type
         /// </summary>
-        public PaymentMethodType PaymentMethodType => (_serviceManager.GetPaymentFlowType()) switch
+        public PaymentMethodType PaymentMethodType => _serviceManager.GetPaymentFlowType() switch
         {
             PaymentFlowType.Redirection => PaymentMethodType.Redirection,
             PaymentFlowType.Inline => PaymentMethodType.Standard,
